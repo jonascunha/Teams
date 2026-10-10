@@ -1,0 +1,19 @@
+{
+  "name": "desafio-21-dias",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web app (PWA) do Desafio 21 Dias - MOOH Personal Studio",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning server.js",
+    "dev": "node --no-warnings=ExperimentalWarning --watch server.js",
+    "test": "node --no-warnings=ExperimentalWarning --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

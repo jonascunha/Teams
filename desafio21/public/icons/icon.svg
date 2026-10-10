@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0a0a0a"/>
+  <rect x="56" y="300" width="400" height="44" rx="10" fill="#c4f82a" transform="skew(-8)"/>
+  <text x="256" y="292" text-anchor="middle" font-family="Impact, 'Arial Black', sans-serif" font-size="250" font-weight="900" fill="#ffffff" letter-spacing="-6">21</text>
+  <text x="256" y="333" text-anchor="middle" font-family="Impact, 'Arial Black', sans-serif" font-size="38" font-weight="900" fill="#0a0a0a" letter-spacing="6">DIAS</text>
+  <text x="256" y="420" text-anchor="middle" font-family="Impact, 'Arial Black', sans-serif" font-size="44" fill="#c4f82a" letter-spacing="10">MOOH</text>
+</svg>
