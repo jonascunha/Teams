@@ -9,6 +9,10 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
 
 let server, base, clock;
 
+// Roda contra SQLite; e também contra PostgreSQL se TEST_DATABASE_URL estiver definida.
+const BACKENDS = [['sqlite', null]];
+if (process.env.TEST_DATABASE_URL) BACKENDS.push(['postgres', process.env.TEST_DATABASE_URL]);
+
 function client() {
   let cookie = '';
   return async (method, url, body) => {
@@ -24,16 +28,22 @@ function client() {
   };
 }
 
-test.before(async () => {
+for (const [backend, databaseUrl] of BACKENDS) {
+test(`fluxo completo do desafio (${backend})`, async (t) => {
+  if (databaseUrl) {
+    const { Client } = require('pg');
+    const c = new Client({ connectionString: databaseUrl });
+    await c.connect();
+    await c.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+    await c.end();
+  }
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desafio21-'));
   clock = new Date('2026-11-01T15:00:00Z');
-  const app = createApp({ dataDir, now: () => clock });
+  const app = await createApp({ dataDir, databaseUrl, bucket: null, now: () => clock });
   await new Promise((r) => { server = app.listen(0, r); });
   base = `http://127.0.0.1:${server.address().port}`;
-});
-test.after(() => server.close());
+  t.after(async () => { server.close(); await app.locals.db.close(); });
 
-test('fluxo completo do desafio', async () => {
   const admin = client();
   const ana = client();
   const bia = client();
@@ -133,3 +143,4 @@ test('fluxo completo do desafio', async () => {
   await ana('POST', '/api/logout');
   assert.equal((await ana('GET', '/api/me')).status, 401);
 });
+}

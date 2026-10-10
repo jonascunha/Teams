@@ -42,8 +42,8 @@ function avatar(user, cls = '') {
   return `<div class="avatar ${cls}">${esc(initial)}</div>`;
 }
 
-function timeAgo(sqlDate) {
-  const d = new Date(sqlDate.replace(' ', 'T') + 'Z');
+function timeAgo(iso) {
+  const d = new Date(iso);
   const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
   if (s < 60) return 'agora';
   if (s < 3600) return `${Math.floor(s / 60)} min`;
@@ -535,7 +535,7 @@ function bindPostEvents(box) {
     const id = Number(el.dataset.post);
     const post = feedPosts.find((p) => p.id === id);
     const refreshOne = async () => {
-      const fresh = (await api('GET', `/posts?before=${id + 1}`)).find((p) => p.id === id);
+      const fresh = (await api('GET', `/posts?id=${id}`))[0];
       if (!fresh) return;
       Object.assign(post, fresh);
       const tmp = document.createElement('div');

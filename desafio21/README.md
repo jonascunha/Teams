@@ -24,37 +24,49 @@ Web app (PWA) do desafio de 21 dias. Abre no navegador do celular (Android e iPh
 
 ## Rodando localmente
 
-Requer **Node.js 22.13+** (usa o SQLite embutido no Node, então não há dependências nativas).
+Requer **Node.js 22.13+**. Sem configuração nenhuma, usa SQLite e uma pasta local para as fotos.
 
 ```bash
 cd desafio21
 npm install
 npm start          # http://localhost:3000
-npm test           # testes da API
+npm test           # testes da API (SQLite)
+TEST_DATABASE_URL=postgres://usuario:senha@localhost/banco_teste npm test   # também contra PostgreSQL
 ```
 
 ### Variáveis de ambiente
 
 | Variável | Padrão | Para quê |
 |---|---|---|
-| `PORT` | `3000` | Porta HTTP |
-| `DATA_DIR` | `./data` | Onde ficam o banco (`desafio.db`) e as fotos (`uploads/`). **Precisa ser um armazenamento persistente.** |
+| `DATABASE_URL` | — | PostgreSQL (Cloud SQL). Sem ela, usa SQLite em `DATA_DIR`. |
+| `GCS_BUCKET` | — | Bucket do Cloud Storage para as fotos. Sem ela, salva em `DATA_DIR/uploads`. |
+| `DATA_DIR` | `./data` | Pasta do SQLite e das fotos no modo local |
 | `JOIN_CODE` | `MOOH21` | Código de inscrição inicial (pode ser alterado no painel) |
 | `TZ_CHALLENGE` | `America/Sao_Paulo` | Fuso usado para calcular o "dia" do desafio |
+| `PORT` | `3000` | Porta HTTP (o Cloud Run define sozinho) |
 
-## Publicando (deploy)
+## Publicando no Google Cloud
 
-O app precisa de **HTTPS** (para instalar como PWA no celular) e de um **disco persistente** (banco e fotos). Opções:
+Arquitetura: **Cloud Run** (o app, com HTTPS automático) + **Cloud SQL PostgreSQL** (banco, com backup diário) + **Cloud Storage** (fotos, bucket privado; as fotos só são entregues para quem está logado) + **Secret Manager** (senha do banco).
 
-- **Render:** o `render.yaml` está pronto (New → Blueprint). Use o plano Starter com disco de 1 GB.
-- **Railway / Fly.io / qualquer VPS:** use o `Dockerfile` e monte um volume em `/data`.
+1. No [console do Google Cloud](https://console.cloud.google.com), selecione o projeto que tem os créditos e anote o **ID do projeto**.
+2. Abra o **Cloud Shell** (ícone `>_` no topo). Ele já vem com `gcloud`, `git` e `node`.
+3. Coloque o código no Cloud Shell (com `git clone` do repositório, ou com **Upload** de um .zip da pasta `desafio21`) e rode:
 
-```bash
-docker build -t desafio21 desafio21
-docker run -p 3000:3000 -v desafio21-dados:/data -e JOIN_CODE=MOOH21 desafio21
-```
+   ```bash
+   cd desafio21
+   PROJECT_ID=seu-projeto ./deploy-gcp.sh
+   ```
 
-**Backup:** copie a pasta `DATA_DIR` (`desafio.db` + `uploads/`).
+   Na primeira vez leva uns 15 minutos (a criação do Cloud SQL é a parte demorada). No final, o script mostra o endereço do app (`https://desafio21-xxxx.a.run.app`).
+4. Abra o endereço, **crie primeiro a conta do personal** (vira administradora) e defina a data de início no painel.
+5. Para publicar uma nova versão depois, rode o mesmo comando de novo.
+
+Opções do script (variáveis de ambiente): `REGION` (padrão `southamerica-east1`, São Paulo), `JOIN_CODE`, `SERVICE`, `INSTANCE`, `BUCKET`.
+
+**Custo estimado:** o Cloud SQL `db-f1-micro` custa cerca de US$ 10 a 15 por mês e fica ligado o tempo todo. O Cloud Run e o Storage, para o tamanho de uma turma, ficam praticamente dentro da cota gratuita. **Depois do desafio**, se quiser parar de gastar créditos, exporte um backup e apague a instância (`gcloud sql instances delete desafio21-db`).
+
+**Domínio próprio (opcional):** no Cloud Run → serviço → *Gerenciar domínios personalizados* (ex.: `desafio.mooh.com.br`).
 
 ## Instalando no celular
 
@@ -67,9 +79,12 @@ docker run -p 3000:3000 -v desafio21-dados:/data -e JOIN_CODE=MOOH21 desafio21
 desafio21/
 ├── server.js            # ponto de entrada
 ├── src/app.js           # API (Express) e regras de acesso
-├── src/db.js            # esquema do SQLite
+├── src/db.js            # banco: PostgreSQL (Cloud SQL) ou SQLite local
+├── src/storage.js       # fotos: Cloud Storage ou pasta local
 ├── src/challenge.js     # conteúdo inicial dos 21 dias, pontos e premiação
 ├── public/              # front-end (SPA sem build) + PWA (manifest, service worker, ícones)
+├── deploy-gcp.sh        # publicação no Google Cloud
+├── Dockerfile
 ├── scripts/make-icons.js
 └── test/api.test.js
 ```

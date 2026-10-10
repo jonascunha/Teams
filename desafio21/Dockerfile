@@ -3,7 +3,6 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY . .
-ENV NODE_ENV=production DATA_DIR=/data PORT=3000
-VOLUME /data
-EXPOSE 3000
+ENV NODE_ENV=production
+# Cloud Run define PORT; o banco e as fotos vêm de DATABASE_URL e GCS_BUCKET.
 CMD ["npm", "start"]
