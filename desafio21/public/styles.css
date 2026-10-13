@@ -17,6 +17,8 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* Garante que o atributo hidden vença regras como .tabbar { display: flex } */
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background: var(--bg);
@@ -129,6 +131,9 @@ textarea.input { min-height: 96px; resize: vertical; }
 .tabs { display: flex; background: var(--surface-2); border-radius: 999px; padding: 4px; margin-bottom: 16px; }
 .tabs button { flex: 1; border: 0; background: transparent; padding: 10px; border-radius: 999px; font-weight: 700; color: var(--muted); cursor: pointer; }
 .tabs button.on { background: var(--lime); color: var(--on-lime); }
+.or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; margin-top: 18px; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.google-btn { display: flex; justify-content: center; min-height: 44px; }
 
 /* ---------- início ---------- */
 .score-card { display: flex; gap: 16px; align-items: center; }

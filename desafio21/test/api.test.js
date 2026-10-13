@@ -28,8 +28,8 @@ function client() {
   };
 }
 
-for (const [backend, databaseUrl] of BACKENDS) {
-test(`fluxo completo do desafio (${backend})`, async (t) => {
+// Sobe o app num banco limpo. O verificador do Google é falso: o "token" é o próprio JSON do perfil.
+async function startApp(t, databaseUrl, extra = {}) {
   if (databaseUrl) {
     const { Client } = require('pg');
     const c = new Client({ connectionString: databaseUrl });
@@ -39,10 +39,22 @@ test(`fluxo completo do desafio (${backend})`, async (t) => {
   }
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desafio21-'));
   clock = new Date('2026-11-01T15:00:00Z');
-  const app = await createApp({ dataDir, databaseUrl, bucket: null, now: () => clock });
+  const app = await createApp({
+    dataDir, databaseUrl, bucket: null, now: () => clock,
+    googleClientId: 'teste.apps.googleusercontent.com',
+    verifyGoogleToken: async (credential) => JSON.parse(credential),
+    ...extra,
+  });
   await new Promise((r) => { server = app.listen(0, r); });
   base = `http://127.0.0.1:${server.address().port}`;
   t.after(async () => { server.close(); await app.locals.db.close(); });
+}
+
+const googleToken = (sub, email, extra = {}) => JSON.stringify({ sub, email, email_verified: true, name: 'Nome Google', ...extra });
+
+for (const [backend, databaseUrl] of BACKENDS) {
+test(`fluxo completo do desafio (${backend})`, async (t) => {
+  await startApp(t, databaseUrl);
 
   const admin = client();
   const ana = client();
@@ -142,5 +154,57 @@ test(`fluxo completo do desafio (${backend})`, async (t) => {
   // logout
   await ana('POST', '/api/logout');
   assert.equal((await ana('GET', '/api/me')).status, 401);
+});
+
+test(`login com Google (${backend})`, async (t) => {
+  await startApp(t, databaseUrl);
+  assert.equal((await client()('GET', '/api/config')).body.googleClientId, 'teste.apps.googleusercontent.com');
+
+  // primeira entrada: pede o código do desafio
+  const carol = client();
+  let r = await carol('POST', '/api/google', { credential: googleToken('g-carol', 'Carol@Gmail.com') });
+  assert.equal(r.status, 409);
+  assert.equal(r.body.needsCode, true);
+  r = await carol('POST', '/api/google', { credential: googleToken('g-carol', 'Carol@Gmail.com'), code: 'errado' });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.needsCode, true);
+  r = await carol('POST', '/api/google', { credential: googleToken('g-carol', 'Carol@Gmail.com'), code: 'mooh21' });
+  assert.equal(r.status, 200);
+  let me = (await carol('GET', '/api/me')).body.user;
+  assert.equal(me.role, 'admin'); // primeira conta
+  assert.equal(me.email, 'carol@gmail.com');
+  assert.equal(me.name, 'Nome Google');
+  assert.equal(me.google, true);
+  assert.equal(me.hasPassword, false);
+
+  // segunda entrada: não pede código
+  const carol2 = client();
+  assert.equal((await carol2('POST', '/api/google', { credential: googleToken('g-carol', 'carol@gmail.com') })).status, 200);
+
+  // conta só-Google não entra com senha, mas pode criar uma
+  r = await client()('POST', '/api/login', { email: 'carol@gmail.com', password: 'qualquer' });
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /Google/);
+  assert.equal((await carol('PUT', '/api/password', { password: 'nova123' })).status, 200);
+  assert.equal((await client()('POST', '/api/login', { email: 'carol@gmail.com', password: 'nova123' })).status, 200);
+  assert.equal((await carol('PUT', '/api/password', { password: 'outra123' })).status, 400); // agora exige a atual
+
+  // conta criada com e-mail e senha é ligada ao Google pelo mesmo e-mail
+  const ana = client();
+  await ana('POST', '/api/register', { name: 'Ana', email: 'ana@gmail.com', password: '123456', code: 'MOOH21' });
+  const anaG = client();
+  assert.equal((await anaG('POST', '/api/google', { credential: googleToken('g-ana', 'ana@gmail.com') })).status, 200);
+  me = (await anaG('GET', '/api/me')).body.user;
+  assert.equal(me.name, 'Ana');
+  assert.equal(me.google, true);
+  assert.equal(me.hasPassword, true);
+  assert.equal((await client()('POST', '/api/login', { email: 'ana@gmail.com', password: '123456' })).status, 200);
+
+  // outra conta Google com o mesmo e-mail é recusada; e-mail não verificado também
+  assert.equal((await client()('POST', '/api/google', { credential: googleToken('g-outro', 'ana@gmail.com') })).status, 400);
+  assert.equal((await client()('POST', '/api/google', { credential: googleToken('g-x', 'x@gmail.com', { email_verified: false }), code: 'MOOH21' })).status, 400);
+
+  // token inválido
+  assert.equal((await client()('POST', '/api/google', { credential: 'lixo' })).status, 400);
 });
 }

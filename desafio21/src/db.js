@@ -11,6 +11,7 @@ const SCHEMA = (ID) => `
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    google_sub TEXT,
     role TEXT NOT NULL DEFAULT 'participant',
     avatar TEXT,
     commitment TEXT NOT NULL DEFAULT '',
@@ -138,6 +139,13 @@ function openSqlite(dataDir) {
 
 async function openDb({ databaseUrl, dataDir }) {
   const db = databaseUrl ? await openPostgres(databaseUrl) : openSqlite(dataDir);
+  // Migração: bancos criados antes do login com Google não têm a coluna google_sub
+  try {
+    await db.get('SELECT google_sub FROM users LIMIT 1');
+  } catch {
+    await db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT');
+  }
+  await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)');
   const { n } = await db.get('SELECT COUNT(*) AS n FROM days');
   if (Number(n) === 0) {
     for (const d of DAYS) {

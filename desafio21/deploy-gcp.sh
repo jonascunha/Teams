@@ -14,6 +14,7 @@ DB_NAME="${DB_NAME:-desafio21}"
 DB_USER="${DB_USER:-desafio}"
 BUCKET="${BUCKET:-${PROJECT_ID}-desafio21-fotos}"
 JOIN_CODE="${JOIN_CODE:-MOOH21}"
+GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"   # opcional: ativa o botão "Continuar com Google" (veja o README)
 SA_NAME="${SERVICE}-run"
 SA="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 SECRET="${SERVICE}-database-url"
@@ -72,11 +73,15 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
   --role=roles/run.builder --condition=None >/dev/null 2>&1 || true
 
+# --update-env-vars mantém as variáveis já configuradas (ex.: GOOGLE_CLIENT_ID de uma publicação anterior)
+ENV_VARS="GCS_BUCKET=$BUCKET,JOIN_CODE=$JOIN_CODE,TZ_CHALLENGE=America/Sao_Paulo"
+[ -n "$GOOGLE_CLIENT_ID" ] && ENV_VARS="$ENV_VARS,GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"
+
 echo "==> Publicando no Cloud Run (o build leva alguns minutos)"
 gcloud run deploy "$SERVICE" --source . --region="$REGION" --quiet \
   --service-account="$SA" \
   --add-cloudsql-instances="$CONN" \
-  --set-env-vars="GCS_BUCKET=$BUCKET,JOIN_CODE=$JOIN_CODE,TZ_CHALLENGE=America/Sao_Paulo" \
+  --update-env-vars="$ENV_VARS" \
   --set-secrets="DATABASE_URL=$SECRET:latest" \
   --allow-unauthenticated --memory=512Mi --min-instances=0 --max-instances=4
 

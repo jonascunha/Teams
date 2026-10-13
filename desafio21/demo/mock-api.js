@@ -156,10 +156,11 @@
       return { ok: true };
     }],
     ['POST', /^\/logout$/, () => { db.session = null; return { ok: true }; }],
+    ['GET', /^\/config$/, () => ({ googleClientId: null })], // a demonstração não tem login com Google
     ['GET', /^\/me$/, () => {
       const u = auth();
       return {
-        user: { ...pub(u), email: u.email, commitment: u.commitment, personal_challenge: u.personal_challenge },
+        user: { ...pub(u), email: u.email, commitment: u.commitment, personal_challenge: u.personal_challenge, hasPassword: true, google: false },
         goals: db.goals.filter((g) => g.user_id === u.id).map(({ id, text, done }) => ({ id, text, done })),
         personal: db.personal.filter((p) => p.user_id === u.id).map((p) => p.day).sort((a, b) => a - b),
         score: scoreFor(u.id),

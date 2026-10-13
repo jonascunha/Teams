@@ -18,6 +18,13 @@ async function createApp(opts = {}) {
   const bucket = opts.bucket !== undefined ? opts.bucket : process.env.GCS_BUCKET;
   const timeZone = opts.timeZone || process.env.TZ_CHALLENGE || 'America/Sao_Paulo';
   const now = opts.now || (() => new Date());
+  const googleClientId = opts.googleClientId !== undefined ? opts.googleClientId : process.env.GOOGLE_CLIENT_ID;
+  // Confere o token do "Continuar com Google" com o Google (os testes injetam um verificador falso)
+  const verifyGoogleToken = opts.verifyGoogleToken || (googleClientId && (() => {
+    const { OAuth2Client } = require('google-auth-library');
+    const client = new OAuth2Client(googleClientId);
+    return async (credential) => (await client.verifyIdToken({ idToken: credential, audience: googleClientId })).getPayload();
+  })());
   const db = await openDb({ databaseUrl, dataDir });
   const storage = createStorage({ bucket, dataDir });
 
@@ -54,6 +61,7 @@ async function createApp(opts = {}) {
     return `${salt}:${hash}`;
   };
   const checkPassword = async (password, stored) => {
+    if (!stored) return false; // conta criada pelo Google, sem senha
     const [salt, hash] = stored.split(':');
     const test = await scrypt(password, salt, 64);
     return crypto.timingSafeEqual(test, Buffer.from(hash, 'hex'));
@@ -98,9 +106,10 @@ async function createApp(opts = {}) {
     if (name) storage.remove(path.basename(name));
   };
 
-  function httpError(status, message) {
+  function httpError(status, message, extra) {
     const e = new Error(message);
     e.status = status;
+    e.extra = extra;
     return e;
   }
 
@@ -112,7 +121,8 @@ async function createApp(opts = {}) {
 
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
-    res.set('Referrer-Policy', 'same-origin');
+    // O botão do Google precisa saber a origem da página
+    res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     next();
   });
 
@@ -167,6 +177,18 @@ async function createApp(opts = {}) {
   }
 
   // ----- auth -----
+  const validJoinCode = async (code) => code.toUpperCase() === String(await getSetting('join_code')).toUpperCase();
+
+  const createUser = async ({ name, email, passwordHash, googleSub }) => {
+    // O primeiro cadastro vira administrador
+    const isFirst = Number((await db.get('SELECT COUNT(*) AS n FROM users')).n) === 0;
+    const row = await db.get('INSERT INTO users (name, email, password_hash, google_sub, role, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
+      name, email, passwordHash, googleSub, isFirst ? 'admin' : 'participant', nowIso());
+    return row.id;
+  };
+
+  api.get('/config', (req, res) => res.json({ googleClientId: googleClientId || null }));
+
   api.post('/register', rateLimit, async (req, res) => {
     const name = cleanText(req.body.name, 60);
     const email = cleanText(req.body.email, 120).toLowerCase();
@@ -174,19 +196,51 @@ async function createApp(opts = {}) {
     const code = cleanText(req.body.code, 40);
     if (!name || !/^\S+@\S+\.\S+$/.test(email)) throw httpError(400, 'Informe nome e e-mail válidos.');
     if (password.length < 6) throw httpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
-    if (code.toUpperCase() !== String(await getSetting('join_code')).toUpperCase()) throw httpError(400, 'Código do desafio incorreto. Peça ao seu personal.');
+    if (!(await validJoinCode(code))) throw httpError(400, 'Código do desafio incorreto. Peça ao seu personal.');
     if (await db.get('SELECT 1 AS x FROM users WHERE email = ?', email)) throw httpError(400, 'Este e-mail já está cadastrado.');
-    // O primeiro cadastro vira administrador
-    const isFirst = Number((await db.get('SELECT COUNT(*) AS n FROM users')).n) === 0;
-    const row = await db.get('INSERT INTO users (name, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id',
-      name, email, await hashPassword(password), isFirst ? 'admin' : 'participant', nowIso());
-    await startSession(req, res, row.id);
+    const id = await createUser({ name, email, passwordHash: await hashPassword(password), googleSub: null });
+    await startSession(req, res, id);
+    res.json({ ok: true });
+  });
+
+  // Login com a conta Google. Na primeira vez, pede o código do desafio (como no cadastro).
+  api.post('/google', rateLimit, async (req, res) => {
+    if (!verifyGoogleToken) throw httpError(400, 'O login com Google não está configurado.');
+    let payload;
+    try {
+      payload = await verifyGoogleToken(String(req.body.credential || ''));
+    } catch {
+      throw httpError(400, 'Não foi possível confirmar o login com o Google. Tente de novo.');
+    }
+    if (!payload || !payload.sub || !payload.email || payload.email_verified !== true) {
+      throw httpError(400, 'Esta conta Google não tem e-mail verificado.');
+    }
+    const email = String(payload.email).toLowerCase();
+    let user = await db.get('SELECT * FROM users WHERE google_sub = ?', payload.sub);
+    if (!user) {
+      user = await db.get('SELECT * FROM users WHERE email = ?', email);
+      if (user) {
+        // Conta já existente com o mesmo e-mail: liga ao Google
+        if (user.google_sub && user.google_sub !== payload.sub) throw httpError(400, 'Este e-mail já está ligado a outra conta Google.');
+        await db.run('UPDATE users SET google_sub = ? WHERE id = ?', payload.sub, user.id);
+      }
+    }
+    if (!user) {
+      const code = cleanText(req.body.code, 40);
+      if (!code) throw httpError(409, 'Informe o código do desafio para criar sua conta.', { needsCode: true });
+      if (!(await validJoinCode(code))) throw httpError(400, 'Código do desafio incorreto. Peça ao seu personal.', { needsCode: true });
+      const name = cleanText(payload.name || email.split('@')[0], 60);
+      const id = await createUser({ name, email, passwordHash: '', googleSub: payload.sub });
+      user = { id };
+    }
+    await startSession(req, res, user.id);
     res.json({ ok: true });
   });
 
   api.post('/login', rateLimit, async (req, res) => {
     const email = cleanText(req.body.email, 120).toLowerCase();
     const user = await db.get('SELECT * FROM users WHERE email = ?', email);
+    if (user && !user.password_hash) throw httpError(400, 'Esta conta entra pelo Google. Use o botão "Continuar com Google".');
     if (!user || !(await checkPassword(String(req.body.password || ''), user.password_hash))) throw httpError(400, 'E-mail ou senha incorretos.');
     await startSession(req, res, user.id);
     res.json({ ok: true });
@@ -212,7 +266,10 @@ async function createApp(opts = {}) {
       db.get('SELECT 1 AS x FROM posts WHERE user_id = ? AND local_date = ?', u.id, today),
     ]);
     res.json({
-      user: { ...publicUser(u), email: u.email, commitment: u.commitment, personal_challenge: u.personal_challenge },
+      user: {
+        ...publicUser(u), email: u.email, commitment: u.commitment, personal_challenge: u.personal_challenge,
+        hasPassword: !!u.password_hash, google: !!u.google_sub,
+      },
       goals,
       personal: personal.map((r) => r.day),
       score,
@@ -277,7 +334,8 @@ async function createApp(opts = {}) {
   });
 
   api.put('/password', auth, async (req, res) => {
-    if (!(await checkPassword(String(req.body.current || ''), req.user.password_hash))) throw httpError(400, 'Senha atual incorreta.');
+    // Quem entrou pelo Google e ainda não tem senha pode criar uma sem informar a atual
+    if (req.user.password_hash && !(await checkPassword(String(req.body.current || ''), req.user.password_hash))) throw httpError(400, 'Senha atual incorreta.');
     const pw = String(req.body.password || '');
     if (pw.length < 6) throw httpError(400, 'A nova senha precisa ter pelo menos 6 caracteres.');
     await db.run('UPDATE users SET password_hash = ? WHERE id = ?', await hashPassword(pw), req.user.id);
@@ -559,7 +617,10 @@ async function createApp(opts = {}) {
   app.use((err, req, res, next) => {
     const status = err.status || (err.type === 'entity.too.large' ? 413 : 500);
     if (status === 500) console.error(err);
-    res.status(status).json({ error: status === 413 ? 'Arquivo muito grande.' : status === 500 ? 'Erro interno. Tente novamente.' : err.message });
+    res.status(status).json({
+      error: status === 413 ? 'Arquivo muito grande.' : status === 500 ? 'Erro interno. Tente novamente.' : err.message,
+      ...(status < 500 && err.extra ? err.extra : {}),
+    });
   });
 
   app.locals.db = db;

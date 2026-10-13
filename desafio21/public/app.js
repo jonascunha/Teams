@@ -23,6 +23,7 @@ async function api(method, url, body) {
   if (!res.ok) {
     const err = new Error(data.error || 'Falha na conexão. Tente novamente.');
     err.status = res.status;
+    err.data = data;
     throw err;
   }
   return data;
@@ -196,7 +197,12 @@ function viewAuth(mode = 'login') {
         <button class="btn block" type="submit">${mode === 'register' ? 'Começar meu desafio' : 'Entrar'}</button>
         ${mode === 'login' ? '<p class="muted small center">Esqueceu a senha? Peça ao seu personal para gerar uma senha temporária.</p>' : ''}
       </form>
+      <div id="google-box" class="stack" hidden>
+        <div class="or"><span>ou</span></div>
+        <div id="google-btn" class="google-btn"></div>
+      </div>
     </div>`;
+  setupGoogleButton(mode);
   $app.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => viewAuth(b.dataset.mode)));
   const form = document.getElementById('auth-form');
   form.addEventListener('submit', async (e) => {
@@ -213,6 +219,85 @@ function viewAuth(mode = 'login') {
     } finally {
       btn.disabled = false;
     }
+  });
+}
+
+// ---------- login com Google ----------
+let appConfig = null;
+async function loadConfig() {
+  if (!appConfig) {
+    try { appConfig = await api('GET', '/config'); } catch { return {}; }
+  }
+  return appConfig;
+}
+
+let gisPromise = null;
+function loadGoogleScript() {
+  gisPromise = gisPromise || new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.onload = resolve;
+    s.onerror = () => { gisPromise = null; reject(new Error('Não foi possível carregar o login do Google.')); };
+    document.head.appendChild(s);
+  });
+  return gisPromise;
+}
+
+async function setupGoogleButton(mode) {
+  const { googleClientId } = await loadConfig();
+  if (!googleClientId) return; // login com Google não configurado: só e-mail e senha
+  try { await loadGoogleScript(); } catch { return; }
+  const box = document.getElementById('google-box');
+  const btn = document.getElementById('google-btn');
+  if (!box || !btn || !window.google?.accounts?.id) return; // a tela mudou enquanto carregava
+  google.accounts.id.initialize({ client_id: googleClientId, callback: (resp) => googleLogin(resp.credential) });
+  box.hidden = false;
+  google.accounts.id.renderButton(btn, {
+    theme: 'filled_black', size: 'large', shape: 'pill', logo_alignment: 'left', locale: 'pt-BR',
+    text: mode === 'register' ? 'signup_with' : 'continue_with',
+    width: Math.min(400, Math.max(240, btn.clientWidth)),
+  });
+}
+
+async function googleLogin(credential, code) {
+  try {
+    await api('POST', '/google', { credential, code });
+    closeModal();
+    state.me = null;
+    if (location.hash === '#/inicio') router(); else location.hash = '#/inicio';
+  } catch (err) {
+    if (err.data && err.data.needsCode) {
+      const form = document.getElementById('code-form');
+      if (!form) return askJoinCode(credential, code ? err.message : '');
+      form.querySelector('.error').textContent = err.message; // código errado: mostra na mesma janela
+      form.querySelector('button').disabled = false;
+      return;
+    }
+    closeModal();
+    const box = document.getElementById('auth-error');
+    if (box) box.textContent = err.message; else toast(err.message, true);
+  }
+}
+
+// Primeira entrada com o Google: pede o código do desafio antes de criar a conta
+function askJoinCode(credential, error) {
+  openModal('Quase lá!', `
+    <p style="margin-top:0">Para criar sua conta com o Google, digite o código do desafio que você recebeu do seu personal.</p>
+    <form id="code-form" class="stack">
+      <label class="field"><span>Código do desafio</span><input class="input" id="join-code" autocapitalize="characters" autocomplete="off" required></label>
+      <div class="error">${esc(error)}</div>
+      <button class="btn block" type="submit">Criar minha conta</button>
+    </form>`, (root) => {
+    const form = root.querySelector('form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const value = root.querySelector('#join-code').value.trim();
+      if (!value) return;
+      form.querySelector('button').disabled = true;
+      googleLogin(credential, value);
+    });
+    root.querySelector('#join-code').focus();
   });
 }
 
@@ -664,11 +749,14 @@ async function viewProfile() {
       <div class="card stack">
         <label class="field"><span>Nome</span><input class="input" id="name" maxlength="60" value="${esc(u.name)}"></label>
         <button class="btn sm ghost" id="save-name">Salvar nome</button>
-        <details><summary class="small" style="cursor:pointer;color:var(--lime)">Alterar senha</summary>
+        ${u.google ? `<div class="small muted">Conta Google conectada: você pode entrar com o botão "Continuar com Google".</div>` : ''}
+        <details><summary class="small" style="cursor:pointer;color:var(--lime)">${u.hasPassword ? 'Alterar senha' : 'Criar senha'}</summary>
           <form id="pw-form" class="stack" style="margin-top:10px">
-            <input class="input" name="current" type="password" placeholder="Senha atual" autocomplete="current-password">
+            ${u.hasPassword
+              ? '<input class="input" name="current" type="password" placeholder="Senha atual" autocomplete="current-password">'
+              : '<p class="small muted" style="margin:0">Com uma senha, você também pode entrar digitando seu e-mail e senha.</p>'}
             <input class="input" name="password" type="password" placeholder="Nova senha (mín. 6)" autocomplete="new-password">
-            <button class="btn sm ghost">Alterar senha</button></form></details>
+            <button class="btn sm ghost">${u.hasPassword ? 'Alterar senha' : 'Criar senha'}</button></form></details>
       </div>
       <p class="center small muted" style="margin:24px 0">MOOH Personal Studio · Treine. Supere. Evolua.</p>
     </div>`;
@@ -678,6 +766,7 @@ async function viewProfile() {
   };
   document.getElementById('logout').addEventListener('click', async () => {
     await api('POST', '/logout').catch(() => {});
+    window.google?.accounts?.id?.disableAutoSelect();
     state.me = null;
     location.hash = '#/inicio';
     router();
@@ -708,7 +797,11 @@ async function viewProfile() {
   document.getElementById('pw-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
-    try { await api('PUT', '/password', f); toast('Senha alterada!'); e.target.reset(); } catch (err) { toast(err.message, true); }
+    try {
+      await api('PUT', '/password', f);
+      toast(u.hasPassword ? 'Senha alterada!' : 'Senha criada!');
+      viewProfile();
+    } catch (err) { toast(err.message, true); }
   });
 }
 
