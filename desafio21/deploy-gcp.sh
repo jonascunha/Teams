@@ -20,8 +20,15 @@ SECRET="${SERVICE}-database-url"
 
 gcloud config set project "$PROJECT_ID" >/dev/null
 
+BILLING="$(gcloud billing projects describe "$PROJECT_ID" --format='value(billingEnabled)' 2>/dev/null || true)"
+if [ "$BILLING" = "False" ]; then
+  echo "O projeto $PROJECT_ID não tem faturamento ativo. Vincule a conta de faturamento com os créditos em:"
+  echo "  https://console.cloud.google.com/billing/linkedaccount?project=$PROJECT_ID"
+  exit 1
+fi
+
 echo "==> Ativando APIs (pode levar alguns minutos na primeira vez)"
-gcloud services enable run.googleapis.com sqladmin.googleapis.com cloudbuild.googleapis.com \
+gcloud services enable --quiet run.googleapis.com sqladmin.googleapis.com cloudbuild.googleapis.com \
   artifactregistry.googleapis.com secretmanager.googleapis.com storage.googleapis.com
 
 echo "==> Banco de dados Cloud SQL (PostgreSQL 16)"
@@ -58,8 +65,15 @@ gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member="serviceAc
 gcloud secrets add-iam-policy-binding "$SECRET" --member="serviceAccount:$SA" \
   --role=roles/secretmanager.secretAccessor >/dev/null
 
-echo "==> Publicando no Cloud Run"
-gcloud run deploy "$SERVICE" --source . --region="$REGION" \
+# Projetos novos: o build do Cloud Run usa a conta de serviço padrão do Compute Engine,
+# que às vezes não recebe as permissões automaticamente.
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role=roles/run.builder --condition=None >/dev/null 2>&1 || true
+
+echo "==> Publicando no Cloud Run (o build leva alguns minutos)"
+gcloud run deploy "$SERVICE" --source . --region="$REGION" --quiet \
   --service-account="$SA" \
   --add-cloudsql-instances="$CONN" \
   --set-env-vars="GCS_BUCKET=$BUCKET,JOIN_CODE=$JOIN_CODE,TZ_CHALLENGE=America/Sao_Paulo" \
