@@ -67,6 +67,15 @@ Opções do script (variáveis de ambiente): `REGION` (padrão `southamerica-eas
 
 **Custo estimado:** o Cloud SQL `db-f1-micro` custa cerca de US$ 10 a 15 por mês e fica ligado o tempo todo. O Cloud Run e o Storage, para o tamanho de uma turma, ficam praticamente dentro da cota gratuita. **Depois do desafio**, se quiser parar de gastar créditos, exporte um backup e apague a instância (`gcloud sql instances delete desafio21-db`).
 
+### Usar um banco gratuito (Neon) no lugar do Cloud SQL
+
+O Cloud SQL cobra o tempo todo (cerca de R$ 80 a 90 por mês). O app funciona com qualquer PostgreSQL, então dá para usar o plano gratuito do [Neon](https://neon.tech). As fotos continuam no Cloud Storage.
+
+- **Migrar um app já publicado:** crie o projeto no Neon, copie o endereço de conexão e rode `PROJECT_ID=seu-projeto ./migrar-para-neon.sh` no Cloud Shell. O script copia e confere os dados, troca o banco do app e volta para o Cloud SQL sozinho se o app não subir. Depois de conferir, desligue o Cloud SQL com o comando que ele mostra no final.
+- **Publicar do zero já com o Neon:** `DATABASE_URL='postgresql://...' PROJECT_ID=seu-projeto ./deploy-gcp.sh` (o Cloud SQL não é criado).
+- Use a conexão **direta** do Neon, sem `-pooler` no endereço.
+- Copiar dados entre dois bancos quaisquer: `node scripts/copy-db.js ORIGEM_URL DESTINO_URL`.
+
 ### Ativar o login com Google (opcional)
 
 Faça depois da primeira publicação, porque é preciso o endereço do app.
@@ -102,7 +111,9 @@ desafio21/
 ├── src/challenge.js     # conteúdo inicial dos 21 dias, pontos e premiação
 ├── public/              # front-end (SPA sem build) + PWA (manifest, service worker, ícones)
 ├── deploy-gcp.sh        # publicação no Google Cloud
+├── migrar-para-neon.sh  # troca o Cloud SQL pelo Neon (gratuito)
 ├── Dockerfile
+├── scripts/copy-db.js   # copia os dados entre dois PostgreSQL
 ├── scripts/make-icons.js
 └── test/api.test.js
 ```

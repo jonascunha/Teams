@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Publica o Desafio 21 Dias no Google Cloud:
-#   Cloud Run (app) + Cloud SQL PostgreSQL (banco) + Cloud Storage (fotos) + Secret Manager (senha do banco).
+#   Cloud Run (app) + PostgreSQL (Cloud SQL ou externo, ex.: Neon) + Cloud Storage (fotos) + Secret Manager (endereço do banco).
 # Rode no Cloud Shell (console.cloud.google.com → ícone ">_"), dentro da pasta desafio21:
-#   PROJECT_ID=meu-projeto ./deploy-gcp.sh
+#   PROJECT_ID=meu-projeto ./deploy-gcp.sh                                  # cria e usa o Cloud SQL
+#   DATABASE_URL='postgresql://...' PROJECT_ID=meu-projeto ./deploy-gcp.sh  # usa um banco externo
 # Pode ser executado de novo para publicar uma nova versão: o que já existe é reaproveitado.
 set -euo pipefail
 
@@ -15,6 +16,7 @@ DB_USER="${DB_USER:-desafio}"
 BUCKET="${BUCKET:-${PROJECT_ID}-desafio21-fotos}"
 JOIN_CODE="${JOIN_CODE:-MOOH21}"
 GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"   # opcional: ativa o botão "Continuar com Google" (veja o README)
+DATABASE_URL="${DATABASE_URL:-}"           # opcional: PostgreSQL externo (ex.: Neon); sem ela, usa o Cloud SQL
 SA_NAME="${SERVICE}-run"
 SA="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 SECRET="${SERVICE}-database-url"
@@ -32,7 +34,33 @@ echo "==> Ativando APIs (pode levar alguns minutos na primeira vez)"
 gcloud services enable --quiet run.googleapis.com sqladmin.googleapis.com cloudbuild.googleapis.com \
   artifactregistry.googleapis.com secretmanager.googleapis.com storage.googleapis.com
 
-echo "==> Banco de dados Cloud SQL (PostgreSQL 16)"
+echo "==> Conta de serviço do app"
+gcloud iam service-accounts describe "$SA" >/dev/null 2>&1 \
+  || gcloud iam service-accounts create "$SA_NAME" --display-name="Desafio 21 Dias (Cloud Run)"
+
+echo "==> Banco de dados"
+if [ -n "$DATABASE_URL" ]; then
+  # Banco externo informado: guarda o endereço no Secret Manager (nova versão, se já existir)
+  if gcloud secrets describe "$SECRET" >/dev/null 2>&1; then
+    printf '%s' "$DATABASE_URL" | gcloud secrets versions add "$SECRET" --data-file=- >/dev/null
+  else
+    printf '%s' "$DATABASE_URL" | gcloud secrets create "$SECRET" --data-file=- --replication-policy=automatic >/dev/null
+  fi
+fi
+# O endereço guardado decide: /cloudsql/ = Cloud SQL; qualquer outro = banco externo
+USE_CLOUD_SQL=1
+if gcloud secrets describe "$SECRET" >/dev/null 2>&1; then
+  case "$(gcloud secrets versions access latest --secret="$SECRET")" in
+    *"/cloudsql/"*) USE_CLOUD_SQL=1 ;;
+    *) USE_CLOUD_SQL=0 ;;
+  esac
+fi
+
+if [ "$USE_CLOUD_SQL" = 0 ]; then
+  echo "Usando banco externo (o Cloud SQL não é criado nem usado)."
+  CLOUDSQL_FLAG="--clear-cloudsql-instances"
+else
+echo "Cloud SQL (PostgreSQL 16)"
 if ! gcloud sql instances describe "$INSTANCE" >/dev/null 2>&1; then
   # db-f1-micro: menor máquina, suficiente para algumas centenas de alunos. Leva ~10 minutos.
   gcloud sql instances create "$INSTANCE" --database-version=POSTGRES_16 --edition=enterprise \
@@ -50,17 +78,17 @@ if ! gcloud secrets describe "$SECRET" >/dev/null 2>&1; then
   printf 'postgresql://%s:%s@/%s?host=/cloudsql/%s' "$DB_USER" "$DB_PASS" "$DB_NAME" "$CONN" \
     | gcloud secrets create "$SECRET" --data-file=- --replication-policy=automatic
 fi
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" \
+  --role=roles/cloudsql.client --condition=None >/dev/null 2>&1 || true
+CLOUDSQL_FLAG="--add-cloudsql-instances=$CONN"
+fi
 
 echo "==> Bucket privado para as fotos"
 gcloud storage buckets describe "gs://$BUCKET" >/dev/null 2>&1 \
   || gcloud storage buckets create "gs://$BUCKET" --location="$REGION" \
        --uniform-bucket-level-access --public-access-prevention
 
-echo "==> Conta de serviço e permissões"
-gcloud iam service-accounts describe "$SA" >/dev/null 2>&1 \
-  || gcloud iam service-accounts create "$SA_NAME" --display-name="Desafio 21 Dias (Cloud Run)"
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" \
-  --role=roles/cloudsql.client --condition=None >/dev/null
+echo "==> Permissões"
 gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member="serviceAccount:$SA" \
   --role=roles/storage.objectAdmin >/dev/null
 gcloud secrets add-iam-policy-binding "$SECRET" --member="serviceAccount:$SA" \
@@ -80,7 +108,7 @@ ENV_VARS="GCS_BUCKET=$BUCKET,JOIN_CODE=$JOIN_CODE,TZ_CHALLENGE=America/Sao_Paulo
 echo "==> Publicando no Cloud Run (o build leva alguns minutos)"
 gcloud run deploy "$SERVICE" --source . --region="$REGION" --quiet \
   --service-account="$SA" \
-  --add-cloudsql-instances="$CONN" \
+  "$CLOUDSQL_FLAG" \
   --update-env-vars="$ENV_VARS" \
   --set-secrets="DATABASE_URL=$SECRET:latest" \
   --allow-unauthenticated --memory=512Mi --min-instances=0 --max-instances=4

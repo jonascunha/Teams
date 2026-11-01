@@ -92,10 +92,24 @@ const SCHEMA = (ID) => `
   CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id);
 `;
 
+// Endereços de bancos gerenciados (ex.: Neon) vêm com sslmode=require e channel_binding=require.
+// O driver já trata "require" como verificação completa do certificado e não usa channel_binding;
+// deixar isso explícito evita um aviso de segurança a cada conexão.
+function normalizeUrl(url) {
+  if (!/[?&]sslmode=/.test(url)) return url;
+  const u = new URL(url);
+  if (['require', 'prefer', 'verify-ca'].includes(u.searchParams.get('sslmode'))) u.searchParams.set('sslmode', 'verify-full');
+  u.searchParams.delete('channel_binding');
+  return u.toString();
+}
+
 async function openPostgres(url) {
   const { Pool, types } = require('pg');
   types.setTypeParser(20, (v) => parseInt(v, 10)); // COUNT/SUM (bigint) como número
-  const pool = new Pool({ connectionString: url, max: Number(process.env.DB_POOL_SIZE) || 5 });
+  const pool = new Pool({ connectionString: normalizeUrl(url), max: Number(process.env.DB_POOL_SIZE) || 5 });
+  // Bancos que "dormem" sem uso (ex.: Neon) derrubam conexões ociosas. Sem este handler,
+  // o erro numa conexão parada no pool derrubaria o servidor; o pool só a descarta e abre outra.
+  pool.on('error', (err) => console.warn('Conexão ociosa com o banco encerrada:', err.message));
   const toPg = (sql) => {
     let i = 0;
     return sql.replace(/\?/g, () => `$${++i}`);
@@ -156,4 +170,4 @@ async function openDb({ databaseUrl, dataDir }) {
   return db;
 }
 
-module.exports = { openDb };
+module.exports = { openDb, normalizeUrl };
