@@ -133,6 +133,20 @@ test(`fluxo completo do desafio (${backend})`, async (t) => {
   // bônus e ranking
   const anaId = me.user.id;
   assert.equal((await admin('POST', `/api/admin/users/${anaId}/bonus`, { points: 2, reason: 'Treino realizado' })).status, 200);
+  // privacidade: aluno não acessa o painel nem dados privados de outros alunos
+  for (const [m, u] of [['GET', '/api/admin/overview'], ['PUT', '/api/admin/settings'], ['POST', `/api/admin/users/${anaId}/bonus`],
+    ['POST', `/api/admin/users/${anaId}/reset-password`], ['DELETE', `/api/admin/users/${anaId}`], ['PUT', '/api/admin/days/1']]) {
+    assert.equal((await bia(m, u, m === 'GET' ? undefined : {})).status, 403, `${m} ${u}`);
+  }
+  const rankPublic = JSON.stringify((await bia('GET', '/api/ranking')).body);
+  for (const secret of ['ana@x.com', 'Beber 2L', 'disposição', 'commitment', 'email']) assert.ok(!rankPublic.includes(secret), secret);
+  // painel das personais mostra o andamento de todos, inclusive o desafio individual
+  const overview = (await admin('GET', '/api/admin/overview')).body;
+  const anaRow = overview.users.find((u) => u.id === anaId);
+  assert.deepEqual(anaRow.doneDays, [1]);
+  assert.deepEqual(anaRow.personalDays, [3]);
+  assert.equal(anaRow.notes[0].note, 'Quero ter mais disposição');
+
   const rank = (await bia('GET', '/api/ranking')).body;
   assert.equal(rank.list[0].name, 'Ana Souza');
   assert.equal(rank.list[0].total, 5);

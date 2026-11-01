@@ -826,47 +826,81 @@ async function viewAdmin() {
   if (state.me.user.role !== 'admin') { location.hash = '#/inicio'; return; }
   const [data, ch] = await Promise.all([api('GET', '/admin/overview'), loadChallenge()]);
   const s = data.settings;
-  const participants = data.users.filter((u) => u.role === 'participant');
+  const students = data.users.filter((u) => u.role === 'participant');
+  const trainers = data.users.filter((u) => u.role === 'admin');
+  const cur = data.currentDay;
+  const running = cur >= 1 && cur <= 21;
+  const didToday = (u) => u.doneDays.includes(cur);
+  const doneToday = running ? students.filter(didToday).length : 0;
+  const average = students.length ? Math.round(students.reduce((t, u) => t + u.score.completed, 0) / students.length * 10) / 10 : 0;
+  const progressSummary = running
+    ? `<div><b class="lime" style="font-size:22px">${doneToday} de ${students.length}</b> alunos já fizeram o desafio de hoje (dia ${cur}).</div>
+       <div class="small muted">Média da turma: ${average} desafio(s) concluído(s).</div>`
+    : cur === 0
+      ? `<div><b>${students.length}</b> aluno(s) inscrito(s). ${s.start_date ? `O desafio começa em <b>${esc(formatDate(s.start_date))}</b>.` : 'Defina a data de início acima.'}</div>`
+      : `<div>Desafio encerrado. Média da turma: <b>${average}</b> desafio(s) concluído(s).</div>`;
+
+  // Uma linha por pessoa: resumo visível e detalhes ao tocar
+  function userRow(u) {
+    const isStudent = u.role === 'participant';
+    const status = !isStudent || !running ? ''
+      : didToday(u) ? '<span class="badge">fez hoje</span>' : '<span class="badge dark">pendente hoje</span>';
+    return `
+          <details class="admin-user" data-pending="${isStudent && running && !didToday(u) ? 1 : 0}" style="padding:10px 0;border-bottom:1px solid var(--line)">
+            <summary class="row">${avatar(u)}<div class="grow"><b>${esc(u.name)}</b> ${isStudent ? status : '<span class="badge">personal</span>'}
+              ${isStudent ? `<div class="small muted">${u.score.completed}/21 desafios · individual ${u.personalDays.length}/21 · <b class="lime">${u.score.total} pts</b></div>` : `<div class="small muted">${esc(u.email)}</div>`}</div>${icon('chevron', 18)}</summary>
+            <div class="stack" style="margin-top:10px">
+              <div class="small muted">${esc(u.email)}</div>
+              ${isStudent ? `
+              <div class="small">Desafios do studio</div>
+              <div class="mini-days">${Array.from({ length: 21 }, (_, i) => `<i class="${u.doneDays.includes(i + 1) ? 'on' : ''}" title="Dia ${i + 1}"></i>`).join('')}</div>
+              ${u.personal_challenge ? `<div class="small"><b>Desafio individual:</b> ${esc(u.personal_challenge)}</div>
+              <div class="mini-days">${Array.from({ length: 21 }, (_, i) => `<i class="${u.personalDays.includes(i + 1) ? 'on' : ''}" title="Dia ${i + 1}"></i>`).join('')}</div>` : '<div class="small muted">Ainda não definiu o desafio individual.</div>'}
+              ${u.commitment ? `<div class="small"><b>Compromisso:</b> ${esc(u.commitment)}</div>` : ''}
+              ${u.notes.length ? `<details><summary class="small lime" style="cursor:pointer">Respostas e anotações (${u.notes.length})</summary>${u.notes.map((n) => `<div class="small" style="margin-top:6px"><b>Dia ${n.day}:</b> ${esc(n.note)}</div>`).join('')}</details>` : ''}
+              <div class="small muted">Pontos: desafios ${u.score.days} · fotos ${u.score.photos} · bônus ${u.score.bonus}</div>
+              ${u.bonuses.length ? `<div class="small">${u.bonuses.map((b) => `<div class="row between"><span>${b.points > 0 ? '+' : ''}${b.points} · ${esc(b.reason)}</span><a href="#" class="muted" data-del-bonus="${b.id}">remover</a></div>`).join('')}</div>` : ''}
+              <form class="bonus-form stack" data-user="${u.id}">
+                <div class="chip-list">${ch.pointsTable.filter(([k]) => k !== 'Foto / check-in').map(([k, v]) => `<button type="button" class="chip" data-reason="${esc(k)}" data-points="${v}">${esc(k)} +${v}</button>`).join('')}</div>
+                <div class="row"><input class="input" name="reason" placeholder="Motivo" style="flex:2"><input class="input" name="points" type="number" placeholder="Pts" style="flex:1"></div>
+                <button class="btn sm">Lançar pontos</button>
+              </form>` : ''}
+              <div class="row" style="flex-wrap:wrap">
+                ${u.id !== state.me.user.id ? `<button class="btn sm ghost" data-role="${u.id}" data-to="${u.role === 'admin' ? 'participant' : 'admin'}">${u.role === 'admin' ? 'Tornar aluno' : 'Tornar personal (admin)'}</button>` : ''}
+                <button class="btn sm ghost" data-reset="${u.id}">Gerar senha temporária</button>
+                ${u.id !== state.me.user.id ? `<button class="btn sm danger" data-remove="${u.id}" data-name="${esc(u.name)}">Remover</button>` : ''}
+              </div>
+            </div>
+          </details>`;
+  }
+
   $app.innerHTML = `
     <div class="page">
       <div class="topbar"><a class="icon-btn" href="#/perfil" aria-label="Voltar">${icon('back', 20)}</a><h1 class="display grow">Painel <span class="lime">personal</span></h1></div>
 
+      <div class="section-title"><h2 class="display">Acompanhamento</h2><span class="small muted">${students.length} aluno(s)</span></div>
       <div class="card stack">
-        <div class="display" style="font-size:20px">Configurações do desafio</div>
+        ${progressSummary}
+        ${running ? `<div class="chip-list" id="student-filter">
+          <button class="chip on" data-filter="all">Todos (${students.length})</button>
+          <button class="chip" data-filter="pending">Não fizeram hoje (${students.length - doneToday})</button>
+        </div>` : ''}
+      </div>
+      <div class="card" id="student-list">
+        ${students.length ? students.map(userRow).join('') : '<p class="muted small" style="margin:0">Nenhum aluno inscrito ainda. Passe o link do app e o código de inscrição para a turma.</p>'}
+      </div>
+
+      <div class="section-title"><h2 class="display">Personais</h2><span class="small muted">${trainers.length}</span></div>
+      <div class="card">${trainers.map(userRow).join('')}</div>
+
+      <div class="section-title"><h2 class="display">Configurações</h2></div>
+      <div class="card stack">
         <label class="field"><span>Data de início (Dia 1)</span><input class="input" type="date" id="start" value="${esc(s.start_date)}"></label>
         <div class="small muted">${data.currentDay === 0 ? 'Desafio ainda não começou.' : data.currentDay > 21 ? 'Desafio encerrado.' : `Hoje é o dia <b class="lime">${data.currentDay}</b>.`}</div>
         <label class="field"><span>Código de inscrição (passe para os alunos)</span><input class="input" id="code" value="${esc(s.join_code)}"></label>
         <label class="field"><span>Meta de pontos</span><input class="input" type="number" id="meta" min="1" value="${s.target_points}"></label>
         <label class="switch"><span>Ranking visível para os alunos</span><input type="checkbox" id="rank" ${s.ranking_visible ? 'checked' : ''}></label>
         <button class="btn" id="save-settings">Salvar configurações</button>
-      </div>
-
-      <div class="section-title"><h2 class="display">Participantes</h2><span class="small muted">${participants.length}</span></div>
-      <div class="card">
-        ${data.users.map((u) => `
-          <details class="admin-user" style="padding:10px 0;border-bottom:1px solid var(--line)">
-            <summary class="row">${avatar(u)}<div class="grow"><b>${esc(u.name)}</b> ${u.role === 'admin' ? '<span class="badge">admin</span>' : ''}
-              <div class="small muted">${u.score.completed}/21 · ${u.score.total} pts</div></div>${icon('chevron', 18)}</summary>
-            <div class="stack" style="margin-top:10px">
-              <div class="small muted">${esc(u.email)}</div>
-              <div class="mini-days">${Array.from({ length: 21 }, (_, i) => `<i class="${u.doneDays.includes(i + 1) ? 'on' : ''}" title="Dia ${i + 1}"></i>`).join('')}</div>
-              ${u.commitment ? `<div class="small"><b>Compromisso:</b> ${esc(u.commitment)}</div>` : ''}
-              ${u.personal_challenge ? `<div class="small"><b>Desafio individual:</b> ${esc(u.personal_challenge)}</div>` : ''}
-              ${u.notes.length ? `<details><summary class="small lime" style="cursor:pointer">Respostas e anotações (${u.notes.length})</summary>${u.notes.map((n) => `<div class="small" style="margin-top:6px"><b>Dia ${n.day}:</b> ${esc(n.note)}</div>`).join('')}</details>` : ''}
-              <div class="small muted">Desafios: ${u.score.days} · Fotos: ${u.score.photos} · Bônus: ${u.score.bonus}</div>
-              ${u.bonuses.length ? `<div class="small">${u.bonuses.map((b) => `<div class="row between"><span>${b.points > 0 ? '+' : ''}${b.points} · ${esc(b.reason)}</span><a href="#" class="muted" data-del-bonus="${b.id}">remover</a></div>`).join('')}</div>` : ''}
-              <form class="bonus-form stack" data-user="${u.id}">
-                <div class="chip-list">${ch.pointsTable.filter(([k]) => k !== 'Foto / check-in').map(([k, v]) => `<button type="button" class="chip" data-reason="${esc(k)}" data-points="${v}">${esc(k)} +${v}</button>`).join('')}</div>
-                <div class="row"><input class="input" name="reason" placeholder="Motivo" style="flex:2"><input class="input" name="points" type="number" placeholder="Pts" style="flex:1"></div>
-                <button class="btn sm">Lançar pontos</button>
-              </form>
-              <div class="row" style="flex-wrap:wrap">
-                ${u.id !== state.me.user.id ? `<button class="btn sm ghost" data-role="${u.id}" data-to="${u.role === 'admin' ? 'participant' : 'admin'}">${u.role === 'admin' ? 'Tornar participante' : 'Tornar admin'}</button>` : ''}
-                <button class="btn sm ghost" data-reset="${u.id}">Gerar senha temporária</button>
-                ${u.id !== state.me.user.id ? `<button class="btn sm danger" data-remove="${u.id}" data-name="${esc(u.name)}">Remover</button>` : ''}
-              </div>
-            </div>
-          </details>`).join('')}
       </div>
 
       <div class="section-title"><h2 class="display">Editar desafios</h2></div>
@@ -876,6 +910,11 @@ async function viewAdmin() {
     </div>`;
 
   const reload = () => viewAdmin();
+  document.querySelectorAll('#student-filter [data-filter]').forEach((chip) => chip.addEventListener('click', () => {
+    document.querySelectorAll('#student-filter .chip').forEach((c) => c.classList.toggle('on', c === chip));
+    const onlyPending = chip.dataset.filter === 'pending';
+    document.querySelectorAll('#student-list .admin-user').forEach((row) => { row.hidden = onlyPending && row.dataset.pending !== '1'; });
+  }));
   document.getElementById('save-settings').addEventListener('click', async () => {
     try {
       await api('PUT', '/admin/settings', {

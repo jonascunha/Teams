@@ -325,6 +325,7 @@
             ...pub(u), email: u.email, commitment: u.commitment, personal_challenge: u.personal_challenge,
             score: scoreFor(u.id),
             doneDays: mine.map((c) => c.day),
+            personalDays: db.personal.filter((p) => p.user_id === u.id).map((p) => p.day).sort((a, b) => a - b),
             notes: mine.filter((c) => c.note).map((c) => ({ day: c.day, note: c.note })),
             bonuses: db.bonuses.filter((b) => b.user_id === u.id).sort((a, b) => b.id - a.id).map(({ id, points, reason, created_at }) => ({ id, points, reason, created_at })),
           };

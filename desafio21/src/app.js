@@ -491,10 +491,11 @@ async function createApp(opts = {}) {
 
   // ----- administração -----
   api.get('/admin/overview', admin, async (req, res) => {
-    const [users, sc, completions, bonuses, startDate, joinCode, meta, rankingVisible, cur] = await Promise.all([
+    const [users, sc, completions, personal, bonuses, startDate, joinCode, meta, rankingVisible, cur] = await Promise.all([
       db.all('SELECT id, name, email, role, avatar, commitment, personal_challenge, created_at FROM users ORDER BY name'),
       scores(),
       db.all('SELECT user_id, day, note FROM completions ORDER BY day'),
+      db.all('SELECT user_id, day FROM personal_checks ORDER BY day'),
       db.all('SELECT id, user_id, points, reason, created_at FROM bonuses ORDER BY id DESC'),
       getSetting('start_date'),
       getSetting('join_code'),
@@ -511,6 +512,7 @@ async function createApp(opts = {}) {
           ...publicUser(u), email: u.email, commitment: u.commitment, personal_challenge: u.personal_challenge, created_at: u.created_at,
           score: sc.of(u.id),
           doneDays: mine.map((c) => c.day),
+          personalDays: personal.filter((p) => p.user_id === u.id).map((p) => p.day),
           notes: mine.filter((c) => c.note).map((c) => ({ day: c.day, note: c.note })),
           bonuses: bonuses.filter((b) => b.user_id === u.id).map(({ user_id, ...b }) => b),
         };
