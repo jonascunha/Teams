@@ -878,6 +878,13 @@ async function viewAdmin() {
     <div class="page">
       <div class="topbar"><a class="icon-btn" href="#/perfil" aria-label="Voltar">${icon('back', 20)}</a><h1 class="display grow">Painel <span class="lime">personal</span></h1></div>
 
+      ${s.start_date ? '' : `
+      <div class="card stack" id="start-alert" style="border-color:var(--lime)">
+        <div class="display" style="font-size:22px">Defina a data de início</div>
+        <p class="small muted" style="margin:0">Sem ela, os alunos veem o desafio como "Em breve" e nenhum dia é liberado. Toque no campo abaixo e escolha o Dia 1.</p>
+        <label class="field"><span>Data de início (Dia 1)</span><input class="input" type="date" id="start-quick"></label>
+        <button class="btn" id="save-start">Salvar data de início</button>
+      </div>`}
       <div class="section-title"><h2 class="display">Acompanhamento</h2><span class="small muted">${students.length} aluno(s)</span></div>
       <div class="card stack">
         ${progressSummary}
@@ -915,6 +922,15 @@ async function viewAdmin() {
     const onlyPending = chip.dataset.filter === 'pending';
     document.querySelectorAll('#student-list .admin-user').forEach((row) => { row.hidden = onlyPending && row.dataset.pending !== '1'; });
   }));
+  document.getElementById('save-start')?.addEventListener('click', async () => {
+    const value = document.getElementById('start-quick').value;
+    if (!value) return toast('Escolha a data no campo acima.', true);
+    try {
+      await api('PUT', '/admin/settings', { start_date: value });
+      toast('Data de início salva!');
+      reload();
+    } catch (e) { toast(e.message, true); }
+  });
   document.getElementById('save-settings').addEventListener('click', async () => {
     try {
       await api('PUT', '/admin/settings', {

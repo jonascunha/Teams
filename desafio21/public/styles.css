@@ -108,6 +108,9 @@ label.field > span { display: block; font-size: 13px; color: var(--muted); margi
 }
 .input:focus { border-color: var(--lime); }
 textarea.input { min-height: 96px; resize: vertical; }
+/* No iPhone, um campo de data vazio fica sem texto e quase some: garante altura e um texto de ajuda */
+input[type="date"].input { min-height: 48px; display: block; -webkit-appearance: none; appearance: none; }
+input[type="date"].input:invalid::-webkit-datetime-edit, input[type="date"].input[value=""]::-webkit-datetime-edit { color: var(--muted); }
 .error { color: var(--danger); font-size: 14px; min-height: 1em; }
 
 .avatar {
