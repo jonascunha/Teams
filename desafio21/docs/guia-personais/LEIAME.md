@@ -1,6 +1,9 @@
-# Guia das Personais (PDF)
+# Guias do app (PDF e vídeos)
 
-Guia de uso do app para as personal trainers, com capturas de tela reais de uma turma de exemplo.
+- **Guia das Personais (PDF)** e **vídeo das personais**: como acompanhar a turma.
+- **Vídeo do aluno** (`video-aluno.js`): do cadastro ao primeiro dia completo.
+
+Todos usam o app de verdade com dados de exemplo (nomes fictícios).
 
 Para gerar de novo (por exemplo, depois de mudar o app), a partir desta pasta:
 
@@ -22,3 +25,6 @@ FF=$(python3 -c "import imageio_ffmpeg as f; print(f.get_ffmpeg_exe())")
 $FF -ss "$(cat .video/inicio.txt)" -i .video/guia-personais.webm -vf "fps=30,scale=780:1328:flags=lanczos" \
   -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -movflags +faststart -an "Video - Guia das Personais - Desafio 21 Dias.mp4"
 ```
+
+O vídeo do aluno é gerado do mesmo jeito, trocando `video.js` por `video-aluno.js` e `guia-personais.webm` por `guia-aluno.webm`.
+Legendas, marcação de toque e ações com ritmo de vídeo ficam em `video-comum.js`.
