@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Guia das Personais · Desafio 21 Dias MOOH</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;1,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* A4, uma seção por página. Marca do studio: preto + verde-limão. */
+  :root {
+    --ink: #111;
+    --muted: #5d6157;
+    --line: #e3e6dc;
+    --lime: #c4f82a;
+    --lime-deep: #5f7f00;
+    --paper: #ffffff;
+    --tint: #f5f8ec;
+    --black: #0a0a0a;
+  }
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font: 10.5pt/1.5 Inter, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; height: 297mm; padding: 16mm 16mm 14mm; position: relative; overflow: hidden; page-break-after: always; display: flex; flex-direction: column; }
+  .page:last-child { page-break-after: auto; }
+  h1, h2, h3, .display { font-family: "Barlow Condensed", "Arial Narrow", sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; line-height: 1; margin: 0; }
+  h2 { font-size: 30pt; margin-bottom: 3mm; text-wrap: balance; }
+  h2 .hl { background: var(--lime); padding: 0 2mm; }
+  h3 { font-size: 15pt; margin: 5mm 0 2mm; }
+  p { margin: 0 0 2.5mm; }
+  .lead { font-size: 11.5pt; color: var(--muted); margin-bottom: 5mm; max-width: 150mm; }
+  .eyebrow { font: 700 8pt Inter, sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: var(--lime-deep); margin-bottom: 2mm; }
+  .foot { position: absolute; left: 16mm; right: 16mm; bottom: 8mm; display: flex; justify-content: space-between; font-size: 8pt; color: var(--muted); border-top: 1px solid var(--line); padding-top: 2mm; }
+  .cols { display: grid; grid-template-columns: 1fr 62mm; gap: 8mm; align-items: start; }
+  .cols.two-shots { grid-template-columns: 1fr 1fr; }
+  .phone { width: 100%; border-radius: 6mm; border: 1.6mm solid var(--black); background: var(--black); display: block; }
+  .phone-cap { font-size: 8.5pt; color: var(--muted); text-align: center; margin-top: 1.5mm; }
+  .shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6mm; }
+  .shots.two { grid-template-columns: repeat(2, 1fr); }
+  .shots.compact { grid-template-columns: repeat(2, 47mm); justify-content: center; gap: 14mm; }
+  .cols.narrow { grid-template-columns: 1fr 48mm; }
+  ol.steps { list-style: none; padding: 0; margin: 0; counter-reset: s; display: grid; gap: 3mm; }
+  ol.steps > li { counter-increment: s; position: relative; padding-left: 10mm; }
+  ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: -0.3mm; width: 7mm; height: 7mm; border-radius: 50%; background: var(--black); color: var(--lime); font: 800 10pt "Barlow Condensed", sans-serif; display: grid; place-items: center; }
+  ul.tight { margin: 0 0 2mm; padding-left: 5mm; }
+  ul.tight li { margin-bottom: 1.2mm; }
+  .box { background: var(--tint); border-left: 1.4mm solid var(--lime); padding: 3mm 4mm; border-radius: 1.5mm; margin: 3mm 0; }
+  .box.warn { background: #fff6e0; border-left-color: #e8a500; }
+  .box b:first-child { display: block; margin-bottom: 1mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 2mm 0 3mm; }
+  th { text-align: left; font: 700 8pt Inter, sans-serif; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); border-bottom: 1.5px solid var(--ink); padding: 1.8mm 2mm; }
+  td { border-bottom: 1px solid var(--line); padding: 1.8mm 2mm; vertical-align: top; }
+  td.c { text-align: center; white-space: nowrap; }
+  table.compact { font-size: 9pt; margin-top: 1mm; }
+  table.compact td, table.compact th { padding: 1.2mm 2mm; }
+  .yes { color: var(--lime-deep); font-weight: 700; }
+  .no { color: #b3261e; font-weight: 700; }
+  .tag { display: inline-block; font: 700 7.5pt Inter, sans-serif; text-transform: uppercase; letter-spacing: .4px; padding: .4mm 1.6mm; border-radius: 3mm; background: var(--lime); color: var(--black); }
+  .tag.dark { background: var(--black); color: var(--lime); }
+  .kbd { font-weight: 700; background: var(--tint); border: 1px solid var(--line); border-radius: 1mm; padding: 0 1.2mm; white-space: nowrap; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* capa */
+  .cover { background: var(--black); color: #fff; padding: 20mm 18mm; }
+  .cover .brand { font: 800 26pt "Barlow Condensed", sans-serif; letter-spacing: 1px; }
+  .cover .brand span { color: var(--lime); }
+  .cover .brand small { display: block; font: 600 8pt Inter, sans-serif; letter-spacing: 3px; color: #aaa; margin-top: 1mm; }
+  .cover .title { margin-top: 38mm; }
+  .cover .title .tag-big { display: inline-block; background: var(--lime); color: var(--black); font: italic 800 30pt "Barlow Condensed", sans-serif; padding: 1mm 4mm; transform: skew(-8deg); }
+  .cover h1 { font-size: 64pt; margin-top: 3mm; color: #fff; }
+  .cover .sub { font-size: 14pt; color: #d6d6d6; margin-top: 6mm; max-width: 140mm; }
+  .cover .sub b { color: var(--lime); }
+  .cover .info { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .cover .info div { border: 1px solid #333; border-radius: 3mm; padding: 4mm 5mm; }
+  .cover .info .k { font: 700 7.5pt Inter, sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #999; }
+  .cover .info .v { font-size: 11pt; font-weight: 700; color: #fff; margin-top: 1.5mm; word-break: break-all; }
+  .cover .info .v.big { font: 800 24pt "Barlow Condensed", sans-serif; color: var(--lime); letter-spacing: 2px; word-break: normal; }
+  .cover .motto { margin-top: 8mm; border: 1.5px solid var(--lime); border-radius: 20mm; text-align: center; padding: 3mm; font-weight: 700; font-size: 10pt; letter-spacing: .5px; }
+  .cover .motto b { color: var(--lime); }
+</style>
+</head>
+<body>
+
+<!-- 1. CAPA -->
+<section class="page cover">
+  <div class="brand">M<span>O</span>OH<small>PERSONAL STUDIO</small></div>
+  <div class="title">
+    <div class="tag-big">Guia das personais</div>
+    <h1>Desafio 21 dias</h1>
+    <p class="sub">Como acompanhar a turma pelo app: o que vocês veem, a rotina de cada dia e como ajudar os alunos. <b>10 a 30 de novembro.</b></p>
+  </div>
+  <div class="info">
+    <div><div class="k">Endereço do app</div><div class="v">desafio21-304643923831.southamerica-east1.run.app</div></div>
+    <div><div class="k">Código de inscrição</div><div class="v big">MOOH21</div></div>
+  </div>
+  <div class="motto">NÃO BUSCAMOS PERFEIÇÃO. BUSCAMOS <b>CONSTÂNCIA.</b></div>
+</section>
+
+<!-- 2. PRIMEIRO ACESSO + VISÕES -->
+<section class="page">
+  <div class="eyebrow">Antes de começar</div>
+  <h2>Primeiro <span class="hl">acesso</span></h2>
+  <div class="cols">
+    <div>
+      <ol class="steps">
+        <li><b>Crie sua conta.</b> Abra o endereço do app no celular, toque em <span class="kbd">Criar conta</span> e use o código <b>MOOH21</b>.</li>
+        <li><b>Peça a liberação de personal.</b> Avise o Jonas: ele toca no seu nome no painel e escolhe <span class="kbd">Tornar personal (admin)</span>.</li>
+        <li><b>Confira.</b> Em <b>Perfil</b> aparece o selo <span class="tag">personal / admin</span> e o botão <span class="kbd">Painel dos personais</span>. É ali que fica tudo o que é exclusivo de vocês.</li>
+        <li><b>Instale na tela inicial.</b> iPhone (Safari): <span class="kbd">Compartilhar</span> → <span class="kbd">Adicionar à Tela de Início</span>. Android (Chrome): menu <span class="kbd">⋮</span> → <span class="kbd">Instalar app</span>.</li>
+      </ol>
+      <h3>O que cada uma vê</h3>
+      <table>
+        <tr><th></th><th class="c">Aluno</th><th class="c">Personal</th></tr>
+        <tr><td>Os próprios desafios, pontos, metas e desafio individual</td><td class="c yes">sim</td><td class="c yes">sim</td></tr>
+        <tr><td>Feed de fotos e Mural de recados</td><td class="c yes">sim</td><td class="c yes">sim + apagar</td></tr>
+        <tr><td>Ranking (nome e pontos)</td><td class="c">se vocês deixarem</td><td class="c yes">sempre</td></tr>
+        <tr><td>E-mail, compromisso, desafio individual e respostas dos <b>outros</b></td><td class="c no">nunca</td><td class="c yes">sim</td></tr>
+        <tr><td>Painel com o andamento de todos</td><td class="c no">bloqueado</td><td class="c yes">sim</td></tr>
+        <tr><td>Publicar no Mural, lançar pontos, editar desafios</td><td class="c no">não</td><td class="c yes">sim</td></tr>
+      </table>
+      <div class="box"><b>Vocês duas têm o mesmo acesso.</b> Tudo o que uma faz (pontos, recados, edições) aparece na hora para a outra. Personais não entram no ranking nem na contagem de alunos.</div>
+    </div>
+    <div>
+      <img class="phone" src="shots/perfil-admin.png" alt="">
+      <div class="phone-cap">Perfil da personal com o botão do painel</div>
+    </div>
+  </div>
+  <div class="foot"><span>Guia das Personais · Desafio 21 Dias MOOH</span><span>2</span></div>
+</section>
+
+<!-- 3. ROTINA + CALENDÁRIO -->
+<section class="page">
+  <div class="eyebrow">Dia a dia</div>
+  <h2>A rotina de <span class="hl">5 minutos</span></h2>
+  <p class="lead">Não precisa ficar no app o dia todo. Uma passada de manhã e outra à noite resolvem.</p>
+  <div class="cols narrow">
+    <div>
+      <h3>De manhã</h3>
+      <ul class="tight">
+        <li>Confira no <b>Mural</b> se há algo para avisar hoje (missão, lembrete, incentivo).</li>
+        <li>Nos dias de missão especial, confira se o texto do dia já está editado (calendário abaixo).</li>
+      </ul>
+      <h3>No fim da tarde</h3>
+      <ul class="tight">
+        <li><b>Painel → Acompanhamento:</b> veja quantos alunos já fizeram o desafio do dia.</li>
+        <li>Toque em <span class="kbd">Não fizeram hoje</span> e mande um incentivo para quem ainda não fez (WhatsApp ou pessoalmente). Dá tempo até a meia-noite.</li>
+      </ul>
+      <h3>À noite</h3>
+      <ul class="tight">
+        <li>Passe pelo <b>Feed</b>: curta e comente as fotos. Isso mantém a turma engajada.</li>
+        <li><b>Lance os pontos extras</b> do dia (treino realizado, água, ajudar colega...). Combinem entre vocês quem lança, para não dar ponto em dobro.</li>
+      </ul>
+    </div>
+    <div>
+      <img class="phone" src="shots/painel-pendentes.png" alt="">
+      <div class="phone-cap">Filtro "Não fizeram hoje"</div>
+    </div>
+  </div>
+  <h3>Calendário: datas que pedem ação de vocês</h3>
+  <table class="compact">
+    <tr><th>Data</th><th>Dia</th><th>O que fazer</th></tr>
+    <tr><td class="num">ter 10/11</td><td>Dia 1 · Meu compromisso</td><td>Largada! Publique um recado de boas-vindas e fixe no topo do Mural.</td></tr>
+    <tr><td class="num">seg 16/11</td><td>Dia 7 · Check-in</td><td>Leiam as respostas "Como estou me sentindo depois de uma semana?" na ficha de cada aluno.</td></tr>
+    <tr><td class="num">até sex 20/11</td><td>Dia 12 · Missão surpresa</td><td><b>Editem o dia 12</b> com a missão surpresa antes de sábado 21/11 (veja a página 6).</td></tr>
+    <tr><td class="num">seg 23/11</td><td>Dia 14 · "Domingo sem culpa"</td><td><b>Atenção:</b> com início numa terça, o dia 14 cai numa <b>segunda-feira</b>. Sugestão: renomear para "Dia sem culpa".</td></tr>
+    <tr><td class="num">até ter 24/11</td><td>Dia 16 · 10 minutos</td><td>Coloquem na descrição do dia 16 o <b>treino extra de 10 minutos</b> para fazer em casa (qua 25/11).</td></tr>
+    <tr><td class="num">até sex 27/11</td><td>Dia 19 · Eu consigo!</td><td>Descrevam a <b>missão extra</b> do dia 19 (sáb 28/11).</td></tr>
+    <tr><td class="num">seg 30/11</td><td>Dia 21 · Eu consegui!</td><td>Último dia. Depois, usem o painel para escolher a premiação (página 8).</td></tr>
+  </table>
+  <div class="foot"><span>Guia das Personais · Desafio 21 Dias MOOH</span><span>3</span></div>
+</section>
+
+<!-- 4. PAINEL -->
+<section class="page">
+  <div class="eyebrow">Acompanhamento</div>
+  <h2>O painel <span class="hl">da turma</span></h2>
+  <p class="lead">Caminho: <b>Perfil → Painel dos personais</b>. É a tela principal de vocês durante o desafio.</p>
+  <div class="cols two-shots">
+    <div>
+      <img class="phone" src="shots/painel-resumo.png" alt="">
+      <div class="phone-cap">Topo do painel: resumo e lista de alunos</div>
+    </div>
+    <div>
+      <ol class="steps">
+        <li><b>Resumo do dia.</b> Mostra quantos alunos já fizeram o desafio de hoje (por exemplo, <b>3 de 6</b>) e a média de desafios concluídos da turma.</li>
+        <li><b>Filtros.</b> <span class="kbd">Todos</span> mostra a turma inteira; <span class="kbd">Não fizeram hoje</span> mostra só quem ainda está pendente.</li>
+        <li><b>Uma linha por aluno</b>, sem precisar abrir:
+          <ul class="tight" style="margin-top:1.5mm">
+            <li><span class="tag">fez hoje</span> ou <span class="tag dark">pendente hoje</span></li>
+            <li>quantos dos 21 desafios do studio já fez</li>
+            <li>quantos dias cumpriu o desafio individual</li>
+            <li>pontos totais</li>
+          </ul>
+        </li>
+        <li><b>Toque no nome</b> para abrir a ficha completa do aluno (próxima página).</li>
+        <li><b>Personais</b> ficam numa lista separada, logo abaixo dos alunos.</li>
+      </ol>
+      <div class="box"><b>Antes do dia 10</b> o resumo mostra quantos alunos já se inscreveram e a data de início. Usem isso para cobrar quem ainda não criou a conta.</div>
+    </div>
+  </div>
+  <div class="foot"><span>Guia das Personais · Desafio 21 Dias MOOH</span><span>4</span></div>
+</section>
+
+<!-- 5. FICHA DO ALUNO E PONTOS -->
+<section class="page">
+  <div class="eyebrow">Acompanhamento individual</div>
+  <h2>Ficha do aluno <span class="hl">e pontos</span></h2>
+  <div class="shots compact" style="margin-bottom:3mm">
+    <div><img class="phone" src="shots/aluno-ficha.png" alt=""><div class="phone-cap">Ficha aberta: progresso, compromisso e respostas</div></div>
+    <div><img class="phone" src="shots/aluno-pontos.png" alt=""><div class="phone-cap">Lançar pontos: toque no motivo e em "Lançar pontos"</div></div>
+  </div>
+  <div class="cols" style="grid-template-columns:1fr 1fr">
+    <div>
+      <h3>O que a ficha mostra</h3>
+      <ul class="tight">
+        <li><b>Desafios do studio:</b> 21 quadradinhos; verde = dia concluído.</li>
+        <li><b>Desafio individual:</b> o desafio que o aluno escolheu e os dias em que cumpriu.</li>
+        <li><b>Compromisso</b> ("Daqui a 21 dias eu quero...").</li>
+        <li><b>Respostas e anotações</b> dos dias de reflexão (1, 7, 15 e 21).</li>
+        <li><b>Pontos</b> separados em desafios, fotos e bônus, com a lista de bônus já lançados.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Como lançar pontos extras</h3>
+      <ol class="steps">
+        <li>Abra a ficha do aluno.</li>
+        <li>Toque no motivo (ex.: <span class="kbd">Treino realizado +2</span>). Motivo e pontos se preenchem sozinhos; dá para editar.</li>
+        <li>Toque em <span class="kbd">Lançar pontos</span>.</li>
+      </ol>
+      <p style="margin-top:2mm">Lançou errado? Toque em <b>remover</b> ao lado do bônus. Para descontar, use pontos negativos (ex.: −2).</p>
+    </div>
+  </div>
+  <table class="compact">
+    <tr><th>Sistema de pontos (do cartaz)</th><th class="c">Pontos</th><th>Quem lança</th></tr>
+    <tr><td>Desafio do dia concluído</td><td class="c">1 a 5</td><td>Automático, quando o aluno marca o dia</td></tr>
+    <tr><td>Foto / check-in no feed</td><td class="c">1</td><td>Automático, 1 por dia com foto</td></tr>
+    <tr><td>Treino realizado · Caminhada/atividade extra</td><td class="c">2</td><td>Personal, na ficha</td></tr>
+    <tr><td>Água</td><td class="c">1</td><td>Personal, na ficha</td></tr>
+    <tr><td>Missão semanal · Desafio surpresa</td><td class="c">3</td><td>Personal, na ficha</td></tr>
+    <tr><td>Ajudar / incentivar outro aluno</td><td class="c">2</td><td>Personal, na ficha</td></tr>
+  </table>
+  <div class="box warn"><b>Importante: os 21 desafios somam 49 pontos.</b> Para chegar à meta de 50, o aluno precisa de fotos no feed ou de pontos extras lançados por vocês.</div>
+  <div class="foot"><span>Guia das Personais · Desafio 21 Dias MOOH</span><span>5</span></div>
+</section>
+
+<!-- 6. MURAL, FEED E EDITAR DESAFIOS -->
+<section class="page">
+  <div class="eyebrow">Comunicação</div>
+  <h2>Mural, feed e <span class="hl">missões</span></h2>
+  <div class="shots">
+    <div><img class="phone" src="shots/mural-novo.png" alt=""><div class="phone-cap">Novo recado no Mural</div></div>
+    <div><img class="phone" src="shots/feed.png" alt=""><div class="phone-cap">Feed: curtir, comentar, apagar</div></div>
+    <div><img class="phone" src="shots/editar-dia.png" alt=""><div class="phone-cap">Editar o dia 12 (missão surpresa)</div></div>
+  </div>
+  <div class="shots" style="margin-top:5mm">
+    <div>
+      <h3 style="margin-top:0">Mural</h3>
+      <ul class="tight">
+        <li>Aba <b>Mural</b> → <span class="kbd">+ Recado</span>.</li>
+        <li>Marque <b>Fixar no topo</b> para avisos importantes.</li>
+        <li>Recados antigos: <b>Desafixar</b> ou <b>Apagar</b>.</li>
+        <li>Links colados na mensagem viram clicáveis (ex.: vídeo do treino extra).</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Feed</h3>
+      <ul class="tight">
+        <li>Curtam (toque duplo na foto) e comentem: é o que mais engaja.</li>
+        <li>Foto inadequada? Toque na <b>lixeira</b>. Vocês podem apagar qualquer foto ou comentário.</li>
+        <li>Vocês também podem postar fotos (aula, turma, treino do dia).</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Editar desafios</h3>
+      <ul class="tight">
+        <li>No fim do Painel, em <b>Editar desafios</b>, toque no dia.</li>
+        <li>Altere título, descrição, pontos ou ícone e salve.</li>
+        <li>A mudança aparece na hora para todos.</li>
+        <li>Use nos dias <b>12</b>, <b>16</b> e <b>19</b>, e no <b>14</b> (segunda-feira).</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Guia das Personais · Desafio 21 Dias MOOH</span><span>6</span></div>
+</section>
+
+<!-- 7. VISÃO DO ALUNO + AJUDA -->
+<section class="page">
+  <div class="eyebrow">Suporte aos alunos</div>
+  <h2>O que o aluno vê <span class="hl">e como ajudar</span></h2>
+  <div class="shots">
+    <div><img class="phone" src="shots/aluno-inicio.png" alt=""><div class="phone-cap">Tela inicial do aluno</div></div>
+    <div><img class="phone" src="shots/aluno-desafios.png" alt=""><div class="phone-cap">Os 21 desafios (dias futuros ficam bloqueados)</div></div>
+    <div><img class="phone" src="shots/senha-temporaria.png" alt=""><div class="phone-cap">Senha temporária para quem esqueceu</div></div>
+  </div>
+  <h3>Dúvidas mais comuns</h3>
+  <table>
+    <tr><th style="width:38%">O aluno diz...</th><th>O que fazer</th></tr>
+    <tr><td>"Esqueci minha senha."</td><td>Painel → toque no nome → <span class="kbd">Gerar senha temporária</span>. Passe a senha; ele troca depois em Perfil → Conta.</td></tr>
+    <tr><td>"Não consigo marcar o desafio."</td><td>Cada dia só abre na sua data, à meia-noite (Brasília). Dias anteriores podem ser marcados até o fim do desafio, em <b>Desafios</b> ou em "Ficou pra trás?" na tela inicial.</td></tr>
+    <tr><td>"Marquei sem querer."</td><td>Ele mesmo desmarca: abre o dia e toca em <b>Desmarcar</b>.</td></tr>
+    <tr><td>"Código incorreto."</td><td>O código é <b>MOOH21</b> (maiúsculas e minúsculas tanto faz). Se vocês trocarem o código no painel, avisem a turma.</td></tr>
+    <tr><td>"Não acho o app no celular."</td><td>Peça para instalar na tela inicial (passo 4 da página 2) ou mande o link de novo.</td></tr>
+    <tr><td>Entrou alguém que não é da turma.</td><td>Painel → toque no nome → <span class="kbd">Remover</span> (apaga a conta e as fotos). Troquem o código de inscrição em <b>Configurações</b>.</td></tr>
+  </table>
+  <div class="foot"><span>Guia das Personais · Desafio 21 Dias MOOH</span><span>7</span></div>
+</section>
+
+<!-- 8. RANKING, CONFIGURAÇÕES E PREMIAÇÃO -->
+<section class="page">
+  <div class="eyebrow">Fechamento</div>
+  <h2>Ranking, ajustes <span class="hl">e premiação</span></h2>
+  <div class="cols two-shots">
+    <div>
+      <div class="shots two">
+        <div><img class="phone" src="shots/ranking.png" alt=""><div class="phone-cap">Ranking</div></div>
+        <div><img class="phone" src="shots/configuracoes.png" alt=""><div class="phone-cap">Configurações (fim do painel)</div></div>
+      </div>
+      <h3>Configurações</h3>
+      <ul class="tight">
+        <li><b>Data de início:</b> 10/11/2026. Já deve estar salva; confiram.</li>
+        <li><b>Código de inscrição</b> e <b>meta de pontos</b> (50).</li>
+        <li><b>Ranking visível para os alunos:</b> ligado, a turma vê a classificação; desligado, só vocês veem. Pode mudar a qualquer momento.</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Como escolher a premiação</h3>
+      <table>
+        <tr><th>Categoria</th><th>Onde olhar no app</th></tr>
+        <tr><td><b>Constância MOOH</b></td><td>Ficha do aluno: quem tem mais quadradinhos verdes nos desafios do studio e no desafio individual.</td></tr>
+        <tr><td><b>Superação MOOH</b></td><td>Respostas dos dias 15 (Meu desafio) e 21 (Eu consegui!) e o compromisso do dia 1.</td></tr>
+        <tr><td><b>Energia MOOH</b></td><td>Quem mais comentou e incentivou no Feed, e os bônus "Ajudar / incentivar outro aluno".</td></tr>
+        <tr><td><b>Desafio completo</b></td><td>Ranking: quem chegou a <b>50 pontos ou mais</b> aparece com "meta batida!".</td></tr>
+      </table>
+      <div class="box"><b>Dica</b>Combinem entre vocês duas, na primeira semana, quem lança os pontos de cada aluno ou de cada tipo. Assim a pontuação fica justa e ninguém recebe ponto em dobro.</div>
+      <div class="box"><b>Problema no app?</b>Falem com o Jonas. Se possível, mandem um print da tela.</div>
+    </div>
+  </div>
+  <div class="foot"><span>Guia das Personais · Desafio 21 Dias MOOH</span><span>8</span></div>
+</section>
+
+</body>
+</html>
