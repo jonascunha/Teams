@@ -164,6 +164,7 @@ input[type="date"].input:invalid::-webkit-datetime-edit, input[type="date"].inpu
 .dot.today { border-color: var(--lime); color: var(--lime); }
 .dot.on.today { color: var(--on-lime); }
 .dot[disabled] { opacity: .35; cursor: default; }
+.dot.on[disabled] { opacity: .85; }
 
 /* ---------- desafios ---------- */
 .week-head { display: flex; align-items: center; gap: 10px; margin: 24px 0 4px; }
@@ -186,6 +187,9 @@ input[type="date"].input:invalid::-webkit-datetime-edit, input[type="date"].inpu
 .day-card.locked { background: #2b2b2b; color: #777; cursor: default; }
 .day-card.locked .dhead { background: #3a3a3a; color: #999; }
 .day-card.locked .box { border-color: #666; }
+.day-card.missed { background: #d9d9d9; color: #555; }
+.day-card.missed .dhead { background: #9a9a9a; color: #222; }
+.day-card.missed .box { border-color: #b3261e; color: #b3261e; }
 .day-card.today { outline: 3px solid var(--lime); outline-offset: 2px; }
 
 .points-list { list-style: none; padding: 0; margin: 0; }
@@ -238,7 +242,8 @@ input[type="date"].input:invalid::-webkit-datetime-edit, input[type="date"].inpu
 .admin-user summary { list-style: none; cursor: pointer; }
 .admin-user summary::-webkit-details-marker { display: none; }
 .mini-days { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 8px; }
-.mini-days i { width: 14px; height: 14px; border-radius: 3px; background: var(--surface-2); }
+.mini-days i { width: 18px; height: 18px; border-radius: 4px; background: var(--surface-2); }
+.mini-days i[data-fix-day] { cursor: pointer; outline: 1px solid var(--line); }
 .mini-days i.on { background: var(--lime); }
 .chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; }

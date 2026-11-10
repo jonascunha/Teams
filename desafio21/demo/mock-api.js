@@ -114,6 +114,13 @@
     return { days, completed: mine.length, bonus, photos, total: days + bonus + photos };
   };
   const auth = () => me() || fail(401, 'Faça login para continuar.');
+  // Regra do desafio: cada dia só pode ser marcado pelo aluno na própria data (igual ao servidor)
+  const assertToday = (day) => {
+    const cur = currentDay();
+    if (cur === 0) fail(400, 'O desafio ainda não começou.');
+    if (day > cur) fail(400, 'Este dia ainda não foi liberado.');
+    if (day < cur) fail(400, 'O prazo deste dia terminou à meia-noite. Cada desafio só vale no próprio dia.');
+  };
   const admin = () => {
     const u = auth();
     if (u.role !== 'admin') fail(403, 'Apenas administradores.');
@@ -184,9 +191,7 @@
       const u = auth();
       day = Number(day);
       if (!db.days.some((d) => d.day === day)) fail(404, 'Dia não encontrado.');
-      const cur = currentDay();
-      if (cur === 0) fail(400, 'O desafio ainda não começou.');
-      if (day > cur) fail(400, 'Este dia ainda não foi liberado.');
+      assertToday(day);
       db.completions = db.completions.filter((c) => !(c.user_id === u.id && c.day === day));
       if (b.done) db.completions.push({ user_id: u.id, day, note: clean(b.note, 2000) });
       return { ok: true, score: scoreFor(u.id) };
@@ -210,7 +215,7 @@
       const u = auth();
       day = Number(day);
       if (day < 1 || day > 21) fail(400, 'Dia inválido.');
-      if (day > currentDay()) fail(400, 'Este dia ainda não chegou.');
+      assertToday(day);
       db.personal = db.personal.filter((p) => !(p.user_id === u.id && p.day === day));
       if (b.done) db.personal.push({ user_id: u.id, day });
       return { ok: true };
@@ -360,6 +365,15 @@
       if (!reason) fail(400, 'Informe o motivo.');
       if (!userById(Number(id))) fail(404, 'Usuário não encontrado.');
       db.bonuses.push({ id: nextId(), user_id: Number(id), admin_id: a.id, points, reason, created_at: new Date().toISOString() });
+      return { ok: true };
+    }],
+    ['PUT', /^\/admin\/users\/(\d+)\/challenge\/(\d+)$/, (b, [id, day]) => {
+      admin();
+      const uid = Number(id); day = Number(day);
+      if (!userById(uid)) fail(404, 'Usuário não encontrado.');
+      if (currentDay() === 0 || day > currentDay()) fail(400, 'Este dia ainda não foi liberado.');
+      db.completions = db.completions.filter((c) => !(c.user_id === uid && c.day === day));
+      if (b.done) db.completions.push({ user_id: uid, day, note: '' });
       return { ok: true };
     }],
     ['DELETE', /^\/admin\/bonus\/(\d+)$/, (b, [id]) => {

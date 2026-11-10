@@ -1,7 +1,9 @@
 // Turma de exemplo usada no guia e no vídeo das personais: 2 personais, 6 alunos no dia 5,
 // com desafios marcados, desafio individual, respostas, bônus, recado no mural e fotos no feed.
-// montarTurma(B, browser) devolve { carol, clients }, onde cada cliente faz chamadas à API logado.
-async function montarTurma(B, browser) {
+// montarTurma(B, browser, relogio) devolve { carol, clients }, onde cada cliente faz chamadas à API logado.
+// Como cada desafio só pode ser marcado no próprio dia, o app precisa ser criado com um relógio controlável:
+// createApp({ ..., now: () => relogio.agora() }) e relogio = criarRelogio().
+async function montarTurma(B, browser, relogio) {
   // fotos de exemplo geradas no navegador
   const ph = await browser.newPage({ viewport: { width: 800, height: 800 } });
   async function photo(emoji, c1, c2, label) {
@@ -38,13 +40,20 @@ async function montarTurma(B, browser) {
     ['Rafael Nunes', [1, 2, 3, 4], [1, 3, 4], 'Comer fruta no café da manhã', ''],
   ];
   const clients = {};
-  for (const [name, days, pers, chal, commit] of alunos) {
+  for (const [name, , , chal, commit] of alunos) {
     const a = mk(); clients[name] = a;
     await a('POST', '/register', { name, email: name.split(' ')[0].toLowerCase() + '@exemplo.com', password: '123456', code: 'MOOH21' });
     await a('PUT', '/profile', { personal_challenge: chal, commitment: commit });
-    for (const d of days) await a('PUT', `/challenge/${d}`, { done: true, note: d === 1 && commit ? commit : '' });
-    for (const d of pers) await a('PUT', `/personal/${d}`, { done: true });
   }
+  // cada dia é marcado na sua própria data: o relógio do app anda do dia 1 ao dia 5
+  for (let dia = 1; dia <= 5; dia++) {
+    relogio.irPara(new Date(Date.parse(start + 'T15:00:00Z') + (dia - 1) * 86400000)); // 12h em São Paulo
+    for (const [name, days, pers, , commit] of alunos) {
+      if (days.includes(dia)) await clients[name]('PUT', `/challenge/${dia}`, { done: true, note: dia === 1 && commit ? commit : '' });
+      if (pers.includes(dia)) await clients[name]('PUT', `/personal/${dia}`, { done: true });
+    }
+  }
+  relogio.voltar(); // de volta ao horário real (hoje = dia 5)
   await clients['Ana Souza']('POST', '/goals', { text: 'Treinar 3x por semana' });
   ov = await carol('GET', '/admin/overview');
   const id = (n) => ov.users.find((u) => u.name === n).id;
@@ -62,4 +71,9 @@ async function montarTurma(B, browser) {
   return { carol, clients };
 }
 
-module.exports = { montarTurma };
+function criarRelogio() {
+  let fixo = null;
+  return { agora: () => fixo || new Date(), irPara: (d) => { fixo = d; }, voltar: () => { fixo = null; } };
+}
+
+module.exports = { montarTurma, criarRelogio };

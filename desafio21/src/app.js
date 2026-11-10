@@ -55,6 +55,13 @@ async function createApp(opts = {}) {
   };
   const targetPoints = async () => Number(await getSetting('target_points', '50'));
 
+  // Regra do desafio: cada dia só pode ser marcado (ou desmarcado) pelo aluno na própria data.
+  const assertToday = (day, cur) => {
+    if (cur === 0) throw httpError(400, 'O desafio ainda não começou.');
+    if (day > cur) throw httpError(400, 'Este dia ainda não foi liberado.');
+    if (day < cur) throw httpError(400, 'O prazo deste dia terminou à meia-noite. Cada desafio só vale no próprio dia.');
+  };
+
   const hashPassword = async (password) => {
     const salt = crypto.randomBytes(16).toString('hex');
     const hash = (await scrypt(password, salt, 64)).toString('hex');
@@ -304,9 +311,7 @@ async function createApp(opts = {}) {
   api.put('/challenge/:day', auth, async (req, res) => {
     const day = Number(req.params.day);
     if (!Number.isInteger(day) || !(await db.get('SELECT 1 AS x FROM days WHERE day = ?', day))) throw httpError(404, 'Dia não encontrado.');
-    const cur = await currentDay();
-    if (cur === 0) throw httpError(400, 'O desafio ainda não começou.');
-    if (day > cur) throw httpError(400, 'Este dia ainda não foi liberado.');
+    assertToday(day, await currentDay());
     if (req.body.done) {
       const note = cleanText(req.body.note, 2000);
       await db.run('INSERT INTO completions (user_id, day, note, completed_at) VALUES (?, ?, ?, ?) ON CONFLICT (user_id, day) DO UPDATE SET note = excluded.note',
@@ -345,7 +350,7 @@ async function createApp(opts = {}) {
   api.put('/personal/:day', auth, async (req, res) => {
     const day = Number(req.params.day);
     if (!Number.isInteger(day) || day < 1 || day > 21) throw httpError(400, 'Dia inválido.');
-    if (day > (await currentDay())) throw httpError(400, 'Este dia ainda não chegou.');
+    assertToday(day, await currentDay());
     if (req.body.done) await db.run('INSERT INTO personal_checks (user_id, day) VALUES (?, ?) ON CONFLICT DO NOTHING', req.user.id, day);
     else await db.run('DELETE FROM personal_checks WHERE user_id = ? AND day = ?', req.user.id, day);
     res.json({ ok: true });
@@ -563,6 +568,20 @@ async function createApp(opts = {}) {
     if (!reason) throw httpError(400, 'Informe o motivo.');
     const u = await findUser(req.params.id);
     await db.run('INSERT INTO bonuses (user_id, admin_id, points, reason, created_at) VALUES (?, ?, ?, ?, ?)', u.id, req.user.id, points, reason, nowIso());
+    res.json({ ok: true });
+  });
+
+  api.put('/admin/users/:id/challenge/:day', admin, async (req, res) => {
+    const u = await findUser(req.params.id);
+    const day = Number(req.params.day);
+    if (!Number.isInteger(day) || !(await db.get('SELECT 1 AS x FROM days WHERE day = ?', day))) throw httpError(404, 'Dia não encontrado.');
+    const cur = await currentDay();
+    if (cur === 0 || day > cur) throw httpError(400, 'Este dia ainda não foi liberado.');
+    if (req.body.done) {
+      await db.run('INSERT INTO completions (user_id, day, note, completed_at) VALUES (?, ?, ?, ?) ON CONFLICT (user_id, day) DO NOTHING', u.id, day, '', nowIso());
+    } else {
+      await db.run('DELETE FROM completions WHERE user_id = ? AND day = ?', u.id, day);
+    }
     res.json({ ok: true });
   });
 

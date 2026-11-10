@@ -2,18 +2,19 @@
 const fs = require('fs');
 const { createApp } = require(require('path').join(__dirname, '..', '..', 'src', 'app'));
 const { chromium, devices } = require('playwright');
-const { montarTurma } = require('./turma-exemplo');
+const { montarTurma, criarRelogio } = require('./turma-exemplo');
 const OUT = process.argv[2];
 const DATA = process.argv[3];
 
 (async () => {
   fs.rmSync(DATA, { recursive: true, force: true });
-  const app = await createApp({ dataDir: DATA, bucket: null, databaseUrl: null });
+  const relogio = criarRelogio();
+  const app = await createApp({ dataDir: DATA, bucket: null, databaseUrl: null, now: () => relogio.agora() });
   const server = app.listen(3495);
   const B = 'http://localhost:3495';
   const browser = await chromium.launch();
 
-  const { carol, clients } = await montarTurma(B, browser);
+  const { carol, clients } = await montarTurma(B, browser, relogio);
 
   const ctx = await browser.newContext({ ...devices['iPhone 13'], deviceScaleFactor: 2, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' });
   const page = await ctx.newPage();

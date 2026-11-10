@@ -79,20 +79,25 @@ test(`fluxo completo do desafio (${backend})`, async (t) => {
   // 01/11 (12h em SP) → dia 3
   assert.equal((await ana('GET', '/api/me')).body.currentDay, 3);
   assert.equal((await ana('PUT', '/api/challenge/4', { done: true })).status, 400);
-  let r = await ana('PUT', '/api/challenge/1', { done: true, note: 'Quero ter mais disposição' });
+  // regra: só vale no próprio dia (hoje é o dia 3); dias passados ficam fechados para o aluno
+  const passado = await ana('PUT', '/api/challenge/1', { done: true });
+  assert.equal(passado.status, 400);
+  assert.match(passado.body.error, /prazo/);
+  let r = await ana('PUT', '/api/challenge/3', { done: true });
   assert.equal(r.body.score.total, 2);
-  r = await ana('PUT', '/api/challenge/2', { done: true });
-  assert.equal(r.body.score.total, 3);
-  r = await ana('PUT', '/api/challenge/2', { done: false });
+  r = await ana('PUT', '/api/challenge/3', { done: false });
+  assert.equal(r.body.score.total, 0);
+  r = await ana('PUT', '/api/challenge/3', { done: true, note: 'Quero ter mais disposição' });
   assert.equal(r.body.score.total, 2);
   const ch = (await ana('GET', '/api/challenge')).body;
   assert.equal(ch.days.length, 21);
-  assert.equal(ch.days[0].note, 'Quero ter mais disposição');
+  assert.equal(ch.days[2].note, 'Quero ter mais disposição');
 
   // desafio individual + metas
   assert.equal((await ana('PUT', '/api/profile', { personal_challenge: 'Beber 2L de água' })).status, 200);
   assert.equal((await ana('PUT', '/api/personal/3', { done: true })).status, 200);
   assert.equal((await ana('PUT', '/api/personal/5', { done: true })).status, 400);
+  assert.equal((await ana('PUT', '/api/personal/1', { done: true })).status, 400);
   await ana('POST', '/api/goals', { text: 'Treinar 3x por semana' });
   let me = (await ana('GET', '/api/me')).body;
   assert.deepEqual(me.personal, [3]);
@@ -143,7 +148,7 @@ test(`fluxo completo do desafio (${backend})`, async (t) => {
   // painel das personais mostra o andamento de todos, inclusive o desafio individual
   const overview = (await admin('GET', '/api/admin/overview')).body;
   const anaRow = overview.users.find((u) => u.id === anaId);
-  assert.deepEqual(anaRow.doneDays, [1]);
+  assert.deepEqual(anaRow.doneDays, [3]);
   assert.deepEqual(anaRow.personalDays, [3]);
   assert.equal(anaRow.notes[0].note, 'Quero ter mais disposição');
 
@@ -160,10 +165,25 @@ test(`fluxo completo do desafio (${backend})`, async (t) => {
   assert.equal((await ana('POST', '/api/login', { email: 'ANA@x.com', password: reset.password })).status, 200);
   assert.equal((await ana('GET', '/api/me')).status, 200);
 
-  // avança o relógio: dia 22 = encerrado, ainda pode marcar dias passados
+  // exceção das personais: marcar um dia passado para o aluno (ex.: o app falhou); aluno não pode
+  assert.equal((await bia('PUT', `/api/admin/users/${anaId}/challenge/1`, { done: true })).status, 403);
+  assert.equal((await admin('PUT', `/api/admin/users/${anaId}/challenge/4`, { done: true })).status, 400); // ainda não liberado
+  assert.equal((await admin('PUT', `/api/admin/users/${anaId}/challenge/1`, { done: true })).status, 200);
+  let anaScore = (await ana('GET', '/api/me')).body.score;
+  assert.equal(anaScore.completed, 2);
+  assert.equal((await admin('PUT', `/api/admin/users/${anaId}/challenge/1`, { done: false })).status, 200);
+  assert.equal((await ana('GET', '/api/me')).body.score.completed, 1);
+
+  // meia-noite: o dia 3 fecha e o dia 4 abre
+  clock = new Date('2026-11-02T03:30:00Z'); // 02/11 00:30 em São Paulo
+  assert.equal((await ana('GET', '/api/me')).body.currentDay, 4);
+  assert.equal((await ana('PUT', '/api/challenge/3', { done: false })).status, 400);
+  assert.equal((await ana('PUT', '/api/challenge/4', { done: true })).status, 200);
+
+  // depois do dia 21 nada mais pode ser marcado pelo aluno
   clock = new Date('2026-11-20T15:00:00Z');
   assert.equal((await ana('GET', '/api/me')).body.currentDay, 22);
-  assert.equal((await ana('PUT', '/api/challenge/21', { done: true })).status, 200);
+  assert.equal((await ana('PUT', '/api/challenge/21', { done: true })).status, 400);
 
   // logout
   await ana('POST', '/api/logout');

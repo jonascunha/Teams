@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { createApp } = require(path.join(__dirname, '..', '..', 'src', 'app'));
 const { chromium, devices } = require('playwright');
-const { montarTurma } = require('./turma-exemplo');
+const { montarTurma, criarRelogio } = require('./turma-exemplo');
 const { OVERLAY, acoes } = require('./video-comum');
 
 const OUT = process.argv[2];
@@ -18,11 +18,12 @@ const H = 664;
 (async () => {
   fs.rmSync(DATA, { recursive: true, force: true });
   fs.mkdirSync(OUT, { recursive: true });
-  const app = await createApp({ dataDir: DATA, bucket: null, databaseUrl: null });
+  const relogio = criarRelogio();
+  const app = await createApp({ dataDir: DATA, bucket: null, databaseUrl: null, now: () => relogio.agora() });
   const server = app.listen(3497);
   const B = 'http://localhost:3497';
   const browser = await chromium.launch();
-  const { carol } = await montarTurma(B, browser);
+  const { carol } = await montarTurma(B, browser, relogio);
   // No vídeo a curtida é feita na tela: tira as curtidas que a Carol já tinha na turma de exemplo
   for (const p of await carol('GET', '/posts')) if (p.liked) await carol('POST', `/posts/${p.id}/like`);
 

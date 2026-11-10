@@ -337,7 +337,6 @@ async function viewHome() {
       </div></div>`;
   }
 
-  const pendingPast = currentDay > 1 ? ch.days.filter((d) => d.day < Math.min(currentDay, 22) && !d.done) : [];
 
   $app.innerHTML = `
     <div class="page">
@@ -360,9 +359,6 @@ async function viewHome() {
       <div class="section-title"><h2 class="display">Desafio de hoje</h2></div>
       ${dayBlock}
 
-      ${pendingPast.length ? `
-        <div class="section-title"><h2 class="display">Ficou pra trás?</h2><span class="small muted">${pendingPast.length} pendente(s)</span></div>
-        <div class="card"><div class="chip-list">${pendingPast.map((d) => `<button class="chip" data-day="${d.day}">Dia ${d.day} · ${esc(d.title)}</button>`).join('')}</div></div>` : ''}
 
       <div class="section-title"><h2 class="display">Meu desafio individual</h2><a class="small" href="#/perfil">Editar</a></div>
       ${personalBlock(me)}
@@ -393,9 +389,9 @@ function personalBlock(me) {
     <div class="row" style="margin-bottom:12px">${icon('target', 22, 'lime')}<b class="grow">${esc(me.user.personal_challenge)}</b><span class="badge dark" id="personal-count">${done.size}/21</span></div>
     <div class="dots">${Array.from({ length: 21 }, (_, i) => {
       const d = i + 1;
-      return `<button class="dot ${done.has(d) ? 'on' : ''} ${d === cur ? 'today' : ''}" data-pday="${d}" ${d > cur ? 'disabled' : ''} aria-label="Dia ${d}">${d}</button>`;
+      return `<button class="dot ${done.has(d) ? 'on' : ''} ${d === cur ? 'today' : ''}" data-pday="${d}" ${d !== cur ? 'disabled' : ''} aria-label="Dia ${d}">${d}</button>`;
     }).join('')}</div>
-    <p class="small muted" style="margin-bottom:0">Toque no dia para marcar que você cumpriu seu desafio individual.</p>
+    <p class="small muted" style="margin-bottom:0">Toque no dia de hoje para marcar que você cumpriu seu desafio individual. Cada dia só vale no próprio dia.</p>
   </div>`;
 }
 
@@ -429,12 +425,17 @@ function openDay(dayNum, refresh) {
   const ch = state.challenge;
   const d = ch.days.find((x) => x.day === dayNum);
   const locked = ch.currentDay === 0 || d.day > ch.currentDay;
+  const closed = !locked && d.day < ch.currentDay; // regra: cada desafio só vale no próprio dia
   const reflective = [1, 7, 15, 21].includes(d.day);
+  const dateOf = (n) => (ch.startDate ? formatDate(addDays(ch.startDate, n - 1)) : '');
   openModal(`Dia ${d.day}`, `
     <div class="row" style="margin-bottom:10px"><span class="lime">${icon(d.icon, 40)}</span>
       <div><div class="display" style="font-size:26px">${esc(d.title)}</div><span class="badge dark">${ptsLabel(d.points)}</span></div></div>
     <p>${esc(d.description)}</p>
-    ${locked ? `<div class="card row">${icon('lock', 20, 'lime')}<span>Este desafio será liberado ${ch.startDate ? 'em ' + esc(formatDate(addDays(ch.startDate, d.day - 1))) : 'quando o desafio começar'}.</span></div>` : `
+    ${locked ? `<div class="card row">${icon('lock', 20, 'lime')}<span>Este desafio será liberado ${ch.startDate ? 'em ' + esc(dateOf(d.day)) : 'quando o desafio começar'}.</span></div>`
+    : closed ? (d.done
+      ? `<div class="card row">${icon('check', 20, 'lime')}<span>Você concluiu este desafio. 💪</span></div>${d.note ? `<p class="small muted" style="margin-top:12px;white-space:pre-wrap">${esc(d.note)}</p>` : ''}`
+      : `<div class="card row">${icon('lock', 20, 'lime')}<span>O prazo deste desafio terminou: ele só podia ser marcado em ${esc(dateOf(d.day))}. Foco no desafio de hoje!</span></div>`) : `
       <label class="field" style="margin:14px 0"><span>${reflective ? 'Sua resposta (fica só para você e seus personais)' : 'Anotação (opcional)'}</span>
         <textarea class="input" id="day-note" maxlength="2000" placeholder="${d.day === 1 ? 'Daqui a 21 dias eu quero...' : 'Como foi?'}">${esc(d.note)}</textarea></label>
       <div class="stack">
@@ -488,12 +489,13 @@ async function viewChallenge() {
 
   function dayCard(d) {
     const locked = ch.currentDay === 0 || d.day > ch.currentDay;
-    const cls = [d.done ? 'done' : '', locked ? 'locked' : '', d.day === ch.currentDay ? 'today' : ''].join(' ');
+    const missed = !locked && !d.done && d.day < ch.currentDay;
+    const cls = [d.done ? 'done' : '', locked ? 'locked' : '', missed ? 'missed' : '', d.day === ch.currentDay ? 'today' : ''].join(' ');
     return `<button class="day-card ${cls}" data-day="${d.day}">
       <div class="dhead">DIA ${d.day}</div>
       <div class="dic">${icon(locked && !d.done ? 'lock' : d.icon, 34)}</div>
       <div class="dtitle">${esc(d.title)}</div>
-      <div class="dpts"><span class="box">${d.done ? icon('check', 14) : ''}</span>${ptsLabel(d.points).toUpperCase()}</div>
+      <div class="dpts"><span class="box">${d.done ? icon('check', 14) : missed ? icon('x', 14) : ''}</span>${missed ? 'NÃO FEITO' : ptsLabel(d.points).toUpperCase()}</div>
     </button>`;
   }
 }
@@ -853,7 +855,12 @@ async function viewAdmin() {
               <div class="small muted">${esc(u.email)}</div>
               ${isStudent ? `
               <div class="small">Desafios do studio</div>
-              <div class="mini-days">${Array.from({ length: 21 }, (_, i) => `<i class="${u.doneDays.includes(i + 1) ? 'on' : ''}" title="Dia ${i + 1}"></i>`).join('')}</div>
+              <div class="mini-days">${Array.from({ length: 21 }, (_, i) => {
+                const day = i + 1;
+                const released = cur >= 1 && day <= Math.min(cur, 21);
+                return `<i class="${u.doneDays.includes(day) ? 'on' : ''}" title="Dia ${day}" ${released ? `data-fix-day="${day}" data-user="${u.id}" data-name="${esc(u.name)}" data-on="${u.doneDays.includes(day) ? 1 : 0}" role="button" tabindex="0"` : ''}></i>`;
+              }).join('')}</div>
+              ${running || cur > 21 ? '<div class="small muted">Exceção: toque num quadradinho para marcar ou desmarcar um dia para o aluno (ex.: o app falhou).</div>' : ''}
               ${u.personal_challenge ? `<div class="small"><b>Desafio individual:</b> ${esc(u.personal_challenge)}</div>
               <div class="mini-days">${Array.from({ length: 21 }, (_, i) => `<i class="${u.personalDays.includes(i + 1) ? 'on' : ''}" title="Dia ${i + 1}"></i>`).join('')}</div>` : '<div class="small muted">Ainda não definiu o desafio individual.</div>'}
               ${u.commitment ? `<div class="small"><b>Compromisso:</b> ${esc(u.commitment)}</div>` : ''}
@@ -917,6 +924,15 @@ async function viewAdmin() {
     </div>`;
 
   const reload = () => viewAdmin();
+  $app.querySelectorAll('[data-fix-day]').forEach((sq) => sq.addEventListener('click', async () => {
+    const on = sq.dataset.on === '1';
+    if (!confirm(`${on ? 'Desmarcar' : 'Marcar'} o dia ${sq.dataset.fixDay} ${on ? 'de' : 'para'} ${sq.dataset.name}?`)) return;
+    try {
+      await api('PUT', `/admin/users/${sq.dataset.user}/challenge/${sq.dataset.fixDay}`, { done: !on });
+      toast(on ? 'Dia desmarcado.' : 'Dia marcado para o aluno.');
+      reload();
+    } catch (e) { toast(e.message, true); }
+  }));
   document.querySelectorAll('#student-filter [data-filter]').forEach((chip) => chip.addEventListener('click', () => {
     document.querySelectorAll('#student-filter .chip').forEach((c) => c.classList.toggle('on', c === chip));
     const onlyPending = chip.dataset.filter === 'pending';

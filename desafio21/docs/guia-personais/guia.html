@@ -36,7 +36,7 @@
   .phone-cap { font-size: 8.5pt; color: var(--muted); text-align: center; margin-top: 1.5mm; }
   .shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6mm; }
   .shots.two { grid-template-columns: repeat(2, 1fr); }
-  .shots.compact { grid-template-columns: repeat(2, 47mm); justify-content: center; gap: 14mm; }
+  .shots.compact { grid-template-columns: repeat(2, 40mm); justify-content: center; gap: 14mm; }
   .cols.narrow { grid-template-columns: 1fr 48mm; }
   ol.steps { list-style: none; padding: 0; margin: 0; counter-reset: s; display: grid; gap: 3mm; }
   ol.steps > li { counter-increment: s; position: relative; padding-left: 10mm; }
@@ -142,7 +142,7 @@
       <h3>No fim da tarde</h3>
       <ul class="tight">
         <li><b>Painel → Acompanhamento:</b> veja quantos alunos já fizeram o desafio do dia.</li>
-        <li>Toque em <span class="kbd">Não fizeram hoje</span> e mande um incentivo para quem ainda não fez (WhatsApp ou pessoalmente). Dá tempo até a meia-noite.</li>
+        <li>Toque em <span class="kbd">Não fizeram hoje</span> e mande um incentivo para quem ainda não fez (WhatsApp ou pessoalmente). <b>O dia fecha à meia-noite</b> e não pode mais ser marcado.</li>
       </ul>
       <h3>À noite</h3>
       <ul class="tight">
@@ -217,6 +217,7 @@
         <li><b>Compromisso</b> ("Daqui a 21 dias eu quero...").</li>
         <li><b>Respostas e anotações</b> dos dias de reflexão (1, 7, 15 e 21).</li>
         <li><b>Pontos</b> separados em desafios, fotos e bônus, com a lista de bônus já lançados.</li>
+        <li><b>Exceção:</b> tocar num quadradinho marca ou desmarca o dia para o aluno. Só em caso justificado (falha do app ou da internet).</li>
       </ul>
     </div>
     <div>
@@ -238,7 +239,7 @@
     <tr><td>Missão semanal · Desafio surpresa</td><td class="c">3</td><td>Personal, na ficha</td></tr>
     <tr><td>Ajudar / incentivar outro aluno</td><td class="c">2</td><td>Personal, na ficha</td></tr>
   </table>
-  <div class="box warn"><b>Importante: os 21 desafios somam 49 pontos.</b> Para chegar à meta de 50, o aluno precisa de fotos no feed ou de pontos extras lançados por vocês.</div>
+  <div class="box warn" style="margin:2mm 0 0"><b style="display:inline">Os 21 desafios somam 49 pontos:</b> para chegar à meta de 50, o aluno precisa de fotos no feed ou de pontos extras.</div>
   <div class="foot"><span>Guia das Personais · Desafio 21 Dias MOOH</span><span>5</span></div>
 </section>
 
@@ -295,8 +296,8 @@
   <table>
     <tr><th style="width:38%">O aluno diz...</th><th>O que fazer</th></tr>
     <tr><td>"Esqueci minha senha."</td><td>Painel → toque no nome → <span class="kbd">Gerar senha temporária</span>. Passe a senha; ele troca depois em Perfil → Conta.</td></tr>
-    <tr><td>"Não consigo marcar o desafio."</td><td>Cada dia só abre na sua data, à meia-noite (Brasília). Dias anteriores podem ser marcados até o fim do desafio, em <b>Desafios</b> ou em "Ficou pra trás?" na tela inicial.</td></tr>
-    <tr><td>"Marquei sem querer."</td><td>Ele mesmo desmarca: abre o dia e toca em <b>Desmarcar</b>.</td></tr>
+    <tr><td>"Não consigo marcar o desafio."</td><td><b>Cada desafio só vale no próprio dia:</b> abre à meia-noite e fecha às 23h59 (Brasília). Dia que passou aparece como "não feito" e o aluno não consegue mais marcar. Se foi problema do app ou da internet, vocês marcam pela ficha (página 5).</td></tr>
+    <tr><td>"Marquei sem querer."</td><td>No mesmo dia, ele mesmo desmarca: abre o dia e toca em <b>Desmarcar</b>. Depois da meia-noite, só vocês, pela ficha.</td></tr>
     <tr><td>"Código incorreto."</td><td>O código é <b>MOOH21</b> (maiúsculas e minúsculas tanto faz). Se vocês trocarem o código no painel, avisem a turma.</td></tr>
     <tr><td>"Não acho o app no celular."</td><td>Peça para instalar na tela inicial (passo 4 da página 2) ou mande o link de novo.</td></tr>
     <tr><td>Entrou alguém que não é da turma.</td><td>Painel → toque no nome → <span class="kbd">Remover</span> (apaga a conta e as fotos). Troquem o código de inscrição em <b>Configurações</b>.</td></tr>
