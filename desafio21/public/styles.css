@@ -280,3 +280,6 @@ input[type="date"].input:invalid::-webkit-datetime-edit, input[type="date"].inpu
 .empty { text-align: center; color: var(--muted); padding: 30px 10px; }
 .empty .ic { color: var(--lime); margin-bottom: 8px; }
 .install-tip { font-size: 13px; }
+.credit { margin: 32px 0 8px; padding-top: 14px; border-top: 1px solid var(--line); text-align: center; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.credit b { color: var(--lime); font-weight: 600; }
+.auth .credit { margin-top: 28px; }

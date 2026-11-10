@@ -760,7 +760,6 @@ async function viewProfile() {
             <input class="input" name="password" type="password" placeholder="Nova senha (mín. 6)" autocomplete="new-password">
             <button class="btn sm ghost">${u.hasPassword ? 'Alterar senha' : 'Criar senha'}</button></form></details>
       </div>
-      <p class="center small muted" style="margin:24px 0">MOOH Personal Studio · Treine. Supere. Evolua.</p>
     </div>`;
 
   const saveProfile = async (body, msg) => {
@@ -1030,4 +1029,16 @@ function editDay(d, after) {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 }
+// Rodapé com o crédito no fim de todas as telas. As telas redesenham #app inteiro,
+// então um observador recoloca o rodapé sempre que o conteúdo muda.
+const CREDIT_HTML = `<footer class="credit">
+  <div>MOOH Personal Studio · Treine. Supere. Evolua.</div>
+  <div>Feito por <b>Jonas Diogo</b></div>
+</footer>`;
+function ensureCredit() {
+  const host = $app.querySelector('.page, .auth');
+  if (host && !host.querySelector(':scope > .credit')) host.insertAdjacentHTML('beforeend', CREDIT_HTML);
+}
+new MutationObserver(ensureCredit).observe($app, { childList: true });
+
 router();
