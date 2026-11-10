@@ -1033,7 +1033,7 @@ if ('serviceWorker' in navigator) {
 // então um observador recoloca o rodapé sempre que o conteúdo muda.
 const CREDIT_HTML = `<footer class="credit">
   <div>MOOH Personal Studio · Treine. Supere. Evolua.</div>
-  <div>Feito por <b>Jonas Diogo</b></div>
+  <div>Feito por <b>Jonas Cunha</b></div>
 </footer>`;
 function ensureCredit() {
   const host = $app.querySelector('.page, .auth');
