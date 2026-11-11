@@ -19,14 +19,20 @@ function gcsStorage(bucketName) {
     }),
     remove: (name) => bucket.file(`uploads/${name}`).delete({ ignoreNotFound: true }).catch(() => {}),
     send: (name, res) => {
-      const stream = bucket.file(`uploads/${name}`).createReadStream();
-      stream.on('response', () => {
-        res.set('Content-Type', contentType(name));
-        res.set('Cache-Control', CACHE);
-      });
+      // O tipo vem da extensão e vai antes do conteúdo: sem ele (e com nosniff), o navegador não mostra a foto.
+      res.set('Content-Type', contentType(name));
+      res.set('Cache-Control', CACHE);
+      // Sem a conferência de integridade no fim do download: se ela falhasse, a conexão seria cortada
+      // depois de a foto já ter sido enviada, e o navegador ficaria com uma imagem quebrada.
+      const stream = bucket.file(`uploads/${name}`).createReadStream({ validation: false });
       stream.on('error', (err) => {
-        if (!res.headersSent) res.status(err.code === 404 ? 404 : 500).end();
-        else res.destroy();
+        console.error(`Falha ao ler a foto ${name} do Cloud Storage:`, err.code || '', err.message);
+        if (!res.headersSent) {
+          res.removeHeader('Cache-Control');
+          res.status(err.code === 404 ? 404 : 500).end();
+        } else {
+          res.destroy(err);
+        }
       });
       stream.pipe(res);
     },
