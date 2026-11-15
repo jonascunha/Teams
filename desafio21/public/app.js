@@ -375,6 +375,7 @@ async function viewHome() {
       <div class="display daynum">Dia ${today.day} de 21 · Semana ${today.week}</div>
       <h3 class="display">${esc(today.title)}</h3>
       <p>${esc(today.description)}</p>
+      ${today.allow_next_day ? '<p class="small muted" style="margin:0">Pode ser marcado hoje ou amanhã, até 23h59.</p>' : ''}
       <div class="row between" style="margin-top:12px">
         <span class="badge dark">${ptsLabel(today.points)}</span>
         ${today.done
@@ -404,10 +405,10 @@ async function viewHome() {
 
       <div class="section-title"><h2 class="display">Desafio de hoje</h2></div>
       ${dayBlock}
-      ${yesterday && !yesterday.done ? `
+      ${yesterday && yesterday.allow_next_day && !yesterday.done ? `
         <div class="section-title"><h2 class="display">Ainda dá tempo</h2></div>
         <div class="card row">
-          <div class="grow"><b>Dia ${yesterday.day} · ${esc(yesterday.title)}</b><div class="small muted">O desafio de ontem pode ser marcado até 23h59 de hoje.</div></div>
+          <div class="grow"><b>Dia ${yesterday.day} · ${esc(yesterday.title)}</b><div class="small muted">Este desafio de ontem pode ser marcado até 23h59 de hoje.</div></div>
           <button class="btn sm" data-day="${yesterday.day}">Marcar</button>
         </div>` : ''}
 
@@ -441,9 +442,9 @@ function personalBlock(me) {
     <div class="row" style="margin-bottom:12px">${icon('target', 22, 'lime')}<b class="grow">${esc(me.user.personal_challenge)}</b><span class="badge dark" id="personal-count">${done.size}/21</span></div>
     <div class="dots">${Array.from({ length: 21 }, (_, i) => {
       const d = i + 1;
-      return `<button class="dot ${done.has(d) ? 'on' : ''} ${d === cur ? 'today' : ''}" data-pday="${d}" ${d !== cur && d !== cur - 1 ? 'disabled' : ''} aria-label="Dia ${d}">${d}</button>`;
+      return `<button class="dot ${done.has(d) ? 'on' : ''} ${d === cur ? 'today' : ''}" data-pday="${d}" ${d !== cur ? 'disabled' : ''} aria-label="Dia ${d}">${d}</button>`;
     }).join('')}</div>
-    <p class="small muted" style="margin-bottom:0">Toque no dia para marcar que você cumpriu seu desafio individual. Dá para marcar no próprio dia ou no dia seguinte.</p>
+    <p class="small muted" style="margin-bottom:0">Toque no dia de hoje para marcar que você cumpriu seu desafio individual. Cada dia só vale no próprio dia.</p>
   </div>`;
 }
 
@@ -477,9 +478,9 @@ function openDay(dayNum, refresh) {
   const ch = state.challenge;
   const d = ch.days.find((x) => x.day === dayNum);
   const locked = ch.currentDay === 0 || d.day > ch.currentDay;
-  // regra: cada desafio pode ser marcado no próprio dia ou no dia seguinte
-  const closed = !locked && d.day < ch.currentDay - 1;
-  const lastChance = !locked && d.day === ch.currentDay - 1;
+  // regra: cada desafio só vale no próprio dia; dias com "vale no dia seguinte" ficam abertos mais um dia
+  const lastChance = !locked && d.allow_next_day && d.day === ch.currentDay - 1;
+  const closed = !locked && d.day < ch.currentDay && !lastChance;
   const reflective = [1, 7, 15, 21].includes(d.day);
   const dateOf = (n) => (ch.startDate ? formatDate(addDays(ch.startDate, n - 1)) : '');
   openModal(`Dia ${d.day}`, `
@@ -489,8 +490,9 @@ function openDay(dayNum, refresh) {
     ${locked ? `<div class="card row">${icon('lock', 20, 'lime')}<span>Este desafio será liberado ${ch.startDate ? 'em ' + esc(dateOf(d.day)) : 'quando o desafio começar'}.</span></div>`
     : closed ? (d.done
       ? `<div class="card row">${icon('check', 20, 'lime')}<span>Você concluiu este desafio. 💪</span></div>${d.note ? `<p class="small muted" style="margin-top:12px;white-space:pre-wrap">${esc(d.note)}</p>` : ''}`
-      : `<div class="card row">${icon('lock', 20, 'lime')}<span>O prazo deste desafio terminou: ele podia ser marcado em ${esc(dateOf(d.day))} ou no dia seguinte. Foco no desafio de hoje!</span></div>`) : `
+      : `<div class="card row">${icon('lock', 20, 'lime')}<span>O prazo deste desafio terminou: ele só podia ser marcado em ${esc(dateOf(d.day))}${d.allow_next_day ? ' ou no dia seguinte' : ''}. Foco no desafio de hoje!</span></div>`) : `
       ${lastChance && !d.done ? `<div class="card row">${icon('flame', 20, 'lime')}<span>Este é o desafio de ontem. <b>Último dia para marcar: hoje, até 23h59.</b></span></div>` : ''}
+      ${d.allow_next_day && d.day === ch.currentDay ? `<div class="small muted" style="margin-top:10px">Este desafio pode ser marcado hoje ou amanhã, até 23h59.</div>` : ''}
       <label class="field" style="margin:14px 0"><span>${reflective ? 'Sua resposta (fica só para você e seus personais)' : 'Anotação (opcional)'}</span>
         <textarea class="input" id="day-note" maxlength="2000" placeholder="${d.day === 1 ? 'Daqui a 21 dias eu quero...' : 'Como foi?'}">${esc(d.note)}</textarea></label>
       <div class="stack">
@@ -544,8 +546,8 @@ async function viewChallenge() {
 
   function dayCard(d) {
     const locked = ch.currentDay === 0 || d.day > ch.currentDay;
-    const missed = !locked && !d.done && d.day < ch.currentDay - 1;
-    const lastChance = !locked && !d.done && d.day === ch.currentDay - 1;
+    const lastChance = !locked && !d.done && d.allow_next_day && d.day === ch.currentDay - 1;
+    const missed = !locked && !d.done && d.day < ch.currentDay && !lastChance;
     const cls = [d.done ? 'done' : '', locked ? 'locked' : '', missed ? 'missed' : '', d.day === ch.currentDay ? 'today' : ''].join(' ');
     return `<button class="day-card ${cls}" data-day="${d.day}">
       <div class="dhead">DIA ${d.day}</div>
@@ -978,7 +980,7 @@ async function viewAdmin() {
 
       <div class="section-title"><h2 class="display">Editar desafios</h2></div>
       <p class="small muted" style="margin-top:0">Use para liberar a missão surpresa, o treino extra e outros ajustes.</p>
-      <div class="card"><div class="chip-list">${ch.days.map((d) => `<button class="chip" data-edit-day="${d.day}">Dia ${d.day} · ${esc(d.title)}</button>`).join('')}</div></div>
+      <div class="card"><div class="chip-list">${ch.days.map((d) => `<button class="chip" data-edit-day="${d.day}">Dia ${d.day} · ${esc(d.title)}${d.allow_next_day ? ' · +1 dia' : ''}</button>`).join('')}</div></div>
       <div style="height:24px"></div>
     </div>`;
 
@@ -1065,6 +1067,7 @@ function editDay(d, after) {
       <label class="field"><span>Pontos</span><input class="input" name="points" type="number" min="0" max="50" value="${d.points}"></label>
       <div class="field"><span class="small muted" style="display:block;margin-bottom:6px;font-weight:600">Ícone</span>
         <div class="icon-pick">${ICON_CHOICES.map((i) => `<button type="button" data-icon="${i}" class="${i === d.icon ? 'on' : ''}">${icon(i, 22)}</button>`).join('')}</div></div>
+      <label class="switch"><span>Pode ser marcado também no dia seguinte<br><span class="small muted">Para desafios que só se cumprem à noite, como o do sono.</span></span><input type="checkbox" name="allow_next_day" ${d.allow_next_day ? 'checked' : ''}></label>
       <button class="btn block">Salvar</button>
     </form>`, (root) => {
     let chosen = d.icon;
@@ -1076,7 +1079,7 @@ function editDay(d, after) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       try {
-        await api('PUT', `/admin/days/${d.day}`, { title: form.elements.title.value, description: form.elements.description.value, points: Number(form.elements.points.value), icon: chosen });
+        await api('PUT', `/admin/days/${d.day}`, { title: form.elements.title.value, description: form.elements.description.value, points: Number(form.elements.points.value), icon: chosen, allow_next_day: form.elements.allow_next_day.checked });
         closeModal();
         toast('Desafio atualizado!');
         after();

@@ -13,7 +13,8 @@ const DAYS = [
   { day: 3, icon: 'walk', title: 'Movimento', points: 2, description: 'Faça pelo menos 20 minutos de caminhada ou outra atividade leve fora do treino.' },
   { day: 4, icon: 'bowl', title: 'Prato colorido', points: 2, description: 'Faça uma refeição com pelo menos 4 cores diferentes.' },
   { day: 5, icon: 'dumbbell', title: 'Sem desculpa', points: 2, description: 'Faça seu treino programado mesmo que a motivação esteja baixa.' },
-  { day: 6, icon: 'moon', title: 'Desafio do sono', points: 2, description: 'Tente dormir um pouco mais cedo e deixe o celular de lado por pelo menos 30 minutos antes de dormir.' },
+  // allowNextDay: o desafio do sono só se cumpre à noite, então pode ser marcado também no dia seguinte
+  { day: 6, icon: 'moon', title: 'Desafio do sono', points: 2, allowNextDay: true, description: 'Tente dormir um pouco mais cedo e deixe o celular de lado por pelo menos 30 minutos antes de dormir.' },
   { day: 7, icon: 'chat-heart', title: 'Check-in', points: 2, description: 'Pare 5 minutos e responda: Como estou me sentindo depois de uma semana?' },
   { day: 8, icon: 'shoe', title: 'Passos', points: 2, description: 'Faça uma caminhada ou aumente sua quantidade habitual de passos.' },
   { day: 9, icon: 'apple', title: 'Missão sem açúcar', points: 1, description: 'Escolha um período do dia para evitar doces e bebidas adoçadas.' },

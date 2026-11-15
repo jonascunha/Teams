@@ -32,7 +32,8 @@ const SCHEMA = (ID) => `
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     points INTEGER NOT NULL,
-    icon TEXT NOT NULL DEFAULT 'star'
+    icon TEXT NOT NULL DEFAULT 'star',
+    allow_next_day INTEGER NOT NULL DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS completions (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -178,11 +179,18 @@ async function openDb({ databaseUrl, dataDir }) {
     await db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT');
   }
   await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)');
+  // Migração: dias que podem ser marcados também no dia seguinte (de início, só o Desafio do sono)
+  try {
+    await db.get('SELECT allow_next_day FROM days LIMIT 1');
+  } catch {
+    await db.exec('ALTER TABLE days ADD COLUMN allow_next_day INTEGER NOT NULL DEFAULT 0');
+    for (const d of DAYS.filter((x) => x.allowNextDay)) await db.run('UPDATE days SET allow_next_day = 1 WHERE day = ?', d.day);
+  }
   const { n } = await db.get('SELECT COUNT(*) AS n FROM days');
   if (Number(n) === 0) {
     for (const d of DAYS) {
-      await db.run('INSERT INTO days (day, title, description, points, icon) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
-        d.day, d.title, d.description, d.points, d.icon);
+      await db.run('INSERT INTO days (day, title, description, points, icon, allow_next_day) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+        d.day, d.title, d.description, d.points, d.icon, d.allowNextDay ? 1 : 0);
     }
   }
   return db;

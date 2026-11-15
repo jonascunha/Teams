@@ -65,7 +65,7 @@
       session: null,
       settings: { start_date: start, join_code: 'MOOH21', target_points: '50', ranking_visible: '1' },
       users,
-      days: DAYS.map((d) => ({ ...d })),
+      days: DAYS.map((d) => ({ ...d, allow_next_day: !!d.allowNextDay })),
       completions,
       personal: [{ user_id: 2, day: 1 }, { user_id: 2, day: 2 }, { user_id: 2, day: 4 }, { user_id: 3, day: 1 }, { user_id: 3, day: 2 }],
       goals: [{ id: 1, user_id: 2, text: 'Treinar 3x por semana', done: 1 }, { id: 2, user_id: 2, text: 'Comer fruta todo dia', done: 0 }],
@@ -114,12 +114,12 @@
     return { days, completed: mine.length, bonus, photos, total: days + bonus + photos };
   };
   const auth = () => me() || fail(401, 'Faça login para continuar.');
-  // Regra do desafio: cada dia pode ser marcado no próprio dia ou no seguinte (igual ao servidor)
-  const assertToday = (day) => {
+  // Regra do desafio: cada dia só no próprio dia; dias com allow_next_day valem também no seguinte (igual ao servidor)
+  const assertToday = (day, allowNextDay = false) => {
     const cur = currentDay();
     if (cur === 0) fail(400, 'O desafio ainda não começou.');
     if (day > cur) fail(400, 'Este dia ainda não foi liberado.');
-    if (day < cur - 1) fail(400, 'O prazo deste dia terminou. Cada desafio pode ser marcado no próprio dia ou no dia seguinte.');
+    if (day < cur && !(allowNextDay && day === cur - 1)) fail(400, 'O prazo deste dia terminou à meia-noite. Cada desafio só vale no próprio dia.');
   };
   const admin = () => {
     const u = auth();
@@ -191,7 +191,7 @@
       const u = auth();
       day = Number(day);
       if (!db.days.some((d) => d.day === day)) fail(404, 'Dia não encontrado.');
-      assertToday(day);
+      assertToday(day, !!db.days.find((x) => x.day === day)?.allow_next_day);
       db.completions = db.completions.filter((c) => !(c.user_id === u.id && c.day === day));
       if (b.done) db.completions.push({ user_id: u.id, day, note: clean(b.note, 2000) });
       return { ok: true, score: scoreFor(u.id) };
@@ -355,6 +355,7 @@
       const description = clean(b.description ?? d.description, 1000);
       if (!title || !description) fail(400, 'Preencha título e descrição.');
       Object.assign(d, { title, description, points: Math.max(0, Math.min(50, Math.trunc(Number(b.points ?? d.points)) || 0)), icon: ICON_LIST.includes(b.icon) ? b.icon : d.icon });
+      if (b.allow_next_day !== undefined) d.allow_next_day = !!b.allow_next_day;
       return { ok: true };
     }],
     ['POST', /^\/admin\/users\/(\d+)\/bonus$/, (b, [id]) => {

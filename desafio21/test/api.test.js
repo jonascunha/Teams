@@ -79,7 +79,7 @@ test(`fluxo completo do desafio (${backend})`, async (t) => {
   // 01/11 (12h em SP) → dia 3
   assert.equal((await ana('GET', '/api/me')).body.currentDay, 3);
   assert.equal((await ana('PUT', '/api/challenge/4', { done: true })).status, 400);
-  // regra: cada dia vale no próprio dia ou no seguinte (hoje é o dia 3): o dia 1 já fechou
+  // regra: cada dia só vale no próprio dia (hoje é o dia 3): os dias 1 e 2 já fecharam
   const passado = await ana('PUT', '/api/challenge/1', { done: true });
   assert.equal(passado.status, 400);
   assert.match(passado.body.error, /prazo/);
@@ -174,23 +174,30 @@ test(`fluxo completo do desafio (${backend})`, async (t) => {
   assert.equal((await admin('PUT', `/api/admin/users/${anaId}/challenge/1`, { done: false })).status, 200);
   assert.equal((await ana('GET', '/api/me')).body.score.completed, 1);
 
-  // meia-noite: o dia 4 abre e o dia 3 ainda pode ser marcado hoje; o dia 2 fecha
+  // meia-noite: o dia 4 abre e o dia 3 fecha
   clock = new Date('2026-11-02T03:30:00Z'); // 02/11 00:30 em São Paulo
   assert.equal((await ana('GET', '/api/me')).body.currentDay, 4);
-  assert.equal((await ana('PUT', '/api/challenge/2', { done: true })).status, 400);
-  assert.equal((await ana('PUT', '/api/challenge/3', { done: false })).status, 200);
-  assert.equal((await ana('PUT', '/api/challenge/3', { done: true })).status, 200);
-  assert.equal((await ana('PUT', '/api/personal/3', { done: false })).status, 200);
-  assert.equal((await ana('PUT', '/api/personal/2', { done: true })).status, 400);
+  assert.equal((await ana('PUT', '/api/challenge/3', { done: false })).status, 400);
+  assert.equal((await ana('PUT', '/api/personal/3', { done: false })).status, 400);
   assert.equal((await ana('PUT', '/api/challenge/4', { done: true })).status, 200);
+
+  // exceção: o Desafio do sono (dia 6) vale também no dia seguinte, e só ele
+  assert.equal((await ana('GET', '/api/challenge')).body.days[5].allow_next_day, true);
+  clock = new Date('2026-11-05T03:30:00Z'); // 05/11 00:30 em São Paulo = dia 7
+  assert.equal((await ana('PUT', '/api/challenge/6', { done: true })).status, 200);
+  assert.equal((await ana('PUT', '/api/personal/6', { done: true })).status, 400); // desafio individual: só no dia
+  clock = new Date('2026-11-06T15:00:00Z'); // dia 8: o dia 7 fechou, o 6 também
+  assert.equal((await ana('PUT', '/api/challenge/7', { done: true })).status, 400);
+  assert.equal((await ana('PUT', '/api/challenge/6', { done: false })).status, 400);
+  // as personais podem ligar a exceção em outro dia (dia 7) e o aluno marca no dia seguinte
+  assert.equal((await admin('PUT', '/api/admin/days/7', { allow_next_day: true })).status, 200);
+  assert.equal((await ana('PUT', '/api/challenge/7', { done: true })).status, 200);
+  assert.equal((await ana('GET', '/api/challenge')).body.days[6].allow_next_day, true);
 
   // depois do dia 21 nada mais pode ser marcado pelo aluno
   clock = new Date('2026-11-20T15:00:00Z');
   assert.equal((await ana('GET', '/api/me')).body.currentDay, 22);
-  assert.equal((await ana('PUT', '/api/challenge/21', { done: true })).status, 200); // dia 21 vale também no dia seguinte
-  assert.equal((await ana('PUT', '/api/challenge/20', { done: true })).status, 400);
-  clock = new Date('2026-11-21T15:00:00Z'); // dia 23: acabou de vez
-  assert.equal((await ana('PUT', '/api/challenge/21', { done: false })).status, 400);
+  assert.equal((await ana('PUT', '/api/challenge/21', { done: true })).status, 400);
 
   // logout
   await ana('POST', '/api/logout');

@@ -55,12 +55,14 @@ async function createApp(opts = {}) {
   };
   const targetPoints = async () => Number(await getSetting('target_points', '50'));
 
-  // Regra do desafio: o aluno marca (ou desmarca) cada dia na própria data ou no dia seguinte.
-  // Ex.: o desafio do dia 3 pode ser marcado no dia 3 e no dia 4; no dia 5 ele fecha.
-  const assertToday = (day, cur) => {
+  // Regra do desafio: o aluno marca (ou desmarca) cada dia só na própria data. Exceção: dias com
+  // "allow_next_day" (ex.: Desafio do sono, que só se cumpre à noite) valem também no dia seguinte.
+  const assertToday = (day, cur, allowNextDay = false) => {
     if (cur === 0) throw httpError(400, 'O desafio ainda não começou.');
     if (day > cur) throw httpError(400, 'Este dia ainda não foi liberado.');
-    if (day < cur - 1) throw httpError(400, 'O prazo deste dia terminou. Cada desafio pode ser marcado no próprio dia ou no dia seguinte.');
+    if (day < cur && !(allowNextDay && day === cur - 1)) {
+      throw httpError(400, 'O prazo deste dia terminou à meia-noite. Cada desafio só vale no próprio dia.');
+    }
   };
 
   const hashPassword = async (password) => {
@@ -305,14 +307,15 @@ async function createApp(opts = {}) {
       pointsTable: POINTS_TABLE,
       awards: AWARDS,
       meta,
-      days: days.map((d) => ({ ...d, week: Math.ceil(d.day / 7), done: done.has(d.day), note: done.get(d.day)?.note || '' })),
+      days: days.map((d) => ({ ...d, allow_next_day: !!d.allow_next_day, week: Math.ceil(d.day / 7), done: done.has(d.day), note: done.get(d.day)?.note || '' })),
     });
   });
 
   api.put('/challenge/:day', auth, async (req, res) => {
     const day = Number(req.params.day);
-    if (!Number.isInteger(day) || !(await db.get('SELECT 1 AS x FROM days WHERE day = ?', day))) throw httpError(404, 'Dia não encontrado.');
-    assertToday(day, await currentDay());
+    const dayRow = Number.isInteger(day) && (await db.get('SELECT allow_next_day FROM days WHERE day = ?', day));
+    if (!dayRow) throw httpError(404, 'Dia não encontrado.');
+    assertToday(day, await currentDay(), !!dayRow.allow_next_day);
     if (req.body.done) {
       const note = cleanText(req.body.note, 2000);
       await db.run('INSERT INTO completions (user_id, day, note, completed_at) VALUES (?, ?, ?, ?) ON CONFLICT (user_id, day) DO UPDATE SET note = excluded.note',
@@ -551,8 +554,9 @@ async function createApp(opts = {}) {
     const description = cleanText(req.body.description ?? d.description, 1000);
     const points = Math.max(0, Math.min(50, Math.trunc(Number(req.body.points ?? d.points)) || 0));
     const icon = ICONS.includes(req.body.icon) ? req.body.icon : d.icon;
+    const allowNextDay = req.body.allow_next_day !== undefined ? (req.body.allow_next_day ? 1 : 0) : d.allow_next_day;
     if (!title || !description) throw httpError(400, 'Preencha título e descrição.');
-    await db.run('UPDATE days SET title = ?, description = ?, points = ?, icon = ? WHERE day = ?', title, description, points, icon, day);
+    await db.run('UPDATE days SET title = ?, description = ?, points = ?, icon = ?, allow_next_day = ? WHERE day = ?', title, description, points, icon, allowNextDay, day);
     res.json({ ok: true });
   });
 
