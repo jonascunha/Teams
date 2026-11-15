@@ -62,24 +62,47 @@ function formatDate(iso) {
 const ptsLabel = (n) => `${n} ${Math.abs(n) === 1 ? 'ponto' : 'pontos'}`;
 
 // Redimensiona a foto no celular antes do envio (economiza dados e espaço)
-async function resizeImage(file, maxSide = 1280, quality = 0.8) {
+const PHOTO_ERROR = 'Não foi possível abrir esta foto. Tente outra foto ou tire um print da tela e envie o print.';
+
+// Carrega a foto do jeito mais leve que o celular suportar. createImageBitmap decodifica fora da tela
+// e aguenta melhor fotos grandes (12–48 MP do iPhone); a <img> fica como alternativa.
+async function decodeImage(file) {
+  if (window.createImageBitmap) {
+    try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { /* tenta com <img> */ }
+  }
   const url = URL.createObjectURL(file);
   try {
-    const img = await new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       const i = new Image();
       i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error('Não foi possível ler esta imagem.'));
+      i.onerror = () => reject(new Error(PHOTO_ERROR));
       i.src = url;
     });
-    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', quality);
   } finally {
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+}
+
+// Redimensiona a foto no celular antes do envio (economiza dados e espaço).
+// Tem prazo: uma foto que o celular não consegue abrir não pode deixar a tela parada sem aviso.
+async function resizeImage(file, maxSide = 1280, quality = 0.8) {
+  const work = (async () => {
+    const img = await decodeImage(file);
+    const w = img.width || img.naturalWidth;
+    const h = img.height || img.naturalHeight;
+    if (!w || !h) throw new Error(PHOTO_ERROR);
+    const scale = Math.min(1, maxSide / Math.max(w, h));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    if (img.close) img.close(); // libera a memória da foto original
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    if (!dataUrl.startsWith('data:image/jpeg')) throw new Error(PHOTO_ERROR);
+    return dataUrl;
+  })();
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error(PHOTO_ERROR)), 25000));
+  return Promise.race([work, timeout]);
 }
 
 function pickImage() {
@@ -702,8 +725,10 @@ function bindPostEvents(box) {
 async function newPost(after) {
   const file = await pickImage();
   if (!file) return;
+  // Mostra na hora que a foto foi recebida: preparar uma foto grande leva alguns segundos
+  openModal('Nova foto', `<div class="empty">${icon('camera', 40)}<p>Preparando a foto...</p></div>`);
   let dataUrl;
-  try { dataUrl = await resizeImage(file); } catch (e) { return toast(e.message, true); }
+  try { dataUrl = await resizeImage(file); } catch (e) { closeModal(); return toast(e.message, true); }
   openModal('Nova foto', `
     <img class="preview" src="${dataUrl}" alt="Pré-visualização">
     <label class="field" style="margin:12px 0"><span>Legenda</span><textarea class="input" id="caption" maxlength="1000" placeholder="Conta pra gente como foi o dia! 💪"></textarea></label>
@@ -809,6 +834,7 @@ async function viewProfile() {
   document.getElementById('change-avatar').addEventListener('click', async () => {
     const file = await pickImage();
     if (!file) return;
+    toast('Preparando a foto...');
     try { await saveProfile({ avatar: await resizeImage(file, 400, 0.85) }, 'Foto atualizada!'); } catch (e) { toast(e.message, true); }
   });
   document.getElementById('save-commitment').addEventListener('click', () => saveProfile({ commitment: document.getElementById('commitment').value }, 'Compromisso salvo!'));
