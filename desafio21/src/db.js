@@ -106,7 +106,13 @@ function normalizeUrl(url) {
 async function openPostgres(url) {
   const { Pool, types } = require('pg');
   types.setTypeParser(20, (v) => parseInt(v, 10)); // COUNT/SUM (bigint) como número
-  const pool = new Pool({ connectionString: normalizeUrl(url), max: Number(process.env.DB_POOL_SIZE) || 5 });
+  const pool = new Pool({
+    connectionString: normalizeUrl(url),
+    max: Number(process.env.DB_POOL_SIZE) || 5,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 15000, // o Neon pode levar alguns segundos para acordar
+    keepAlive: true,
+  });
   // Bancos que "dormem" sem uso (ex.: Neon) derrubam conexões ociosas. Sem este handler,
   // o erro numa conexão parada no pool derrubaria o servidor; o pool só a descarta e abre outra.
   pool.on('error', (err) => console.warn('Conexão ociosa com o banco encerrada:', err.message));
@@ -114,7 +120,19 @@ async function openPostgres(url) {
     let i = 0;
     return sql.replace(/\?/g, () => `$${++i}`);
   };
-  const query = (sql, params) => pool.query(toPg(sql), params);
+  // Conexão que caiu enquanto o app estava parado (Cloud Run pausa entre pedidos; o Neon dorme sem uso):
+  // a primeira consulta falha antes de chegar ao banco. Repete uma vez numa conexão nova.
+  const CONNECTION_LOST = /Connection terminated|terminating connection|ECONNRESET|EPIPE|Client has encountered a connection error/i;
+  const isConnectionLost = (e) => CONNECTION_LOST.test(e.message || '') || ['57P01', '08003', '08006', 'ECONNRESET', 'EPIPE'].includes(e.code);
+  const query = async (sql, params) => {
+    try {
+      return await pool.query(toPg(sql), params);
+    } catch (e) {
+      if (!isConnectionLost(e)) throw e;
+      console.warn('Conexão com o banco caiu; repetindo a consulta:', e.message);
+      return pool.query(toPg(sql), params);
+    }
+  };
   const db = {
     dialect: 'postgres',
     get: async (sql, ...p) => (await query(sql, p)).rows[0],

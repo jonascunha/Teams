@@ -55,11 +55,12 @@ async function createApp(opts = {}) {
   };
   const targetPoints = async () => Number(await getSetting('target_points', '50'));
 
-  // Regra do desafio: cada dia só pode ser marcado (ou desmarcado) pelo aluno na própria data.
+  // Regra do desafio: o aluno marca (ou desmarca) cada dia na própria data ou no dia seguinte.
+  // Ex.: o desafio do dia 3 pode ser marcado no dia 3 e no dia 4; no dia 5 ele fecha.
   const assertToday = (day, cur) => {
     if (cur === 0) throw httpError(400, 'O desafio ainda não começou.');
     if (day > cur) throw httpError(400, 'Este dia ainda não foi liberado.');
-    if (day < cur) throw httpError(400, 'O prazo deste dia terminou à meia-noite. Cada desafio só vale no próprio dia.');
+    if (day < cur - 1) throw httpError(400, 'O prazo deste dia terminou. Cada desafio pode ser marcado no próprio dia ou no dia seguinte.');
   };
 
   const hashPassword = async (password) => {

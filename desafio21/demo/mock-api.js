@@ -114,12 +114,12 @@
     return { days, completed: mine.length, bonus, photos, total: days + bonus + photos };
   };
   const auth = () => me() || fail(401, 'Faça login para continuar.');
-  // Regra do desafio: cada dia só pode ser marcado pelo aluno na própria data (igual ao servidor)
+  // Regra do desafio: cada dia pode ser marcado no próprio dia ou no seguinte (igual ao servidor)
   const assertToday = (day) => {
     const cur = currentDay();
     if (cur === 0) fail(400, 'O desafio ainda não começou.');
     if (day > cur) fail(400, 'Este dia ainda não foi liberado.');
-    if (day < cur) fail(400, 'O prazo deste dia terminou à meia-noite. Cada desafio só vale no próprio dia.');
+    if (day < cur - 1) fail(400, 'O prazo deste dia terminou. Cada desafio pode ser marcado no próprio dia ou no dia seguinte.');
   };
   const admin = () => {
     const u = auth();

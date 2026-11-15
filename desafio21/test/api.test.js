@@ -79,7 +79,7 @@ test(`fluxo completo do desafio (${backend})`, async (t) => {
   // 01/11 (12h em SP) → dia 3
   assert.equal((await ana('GET', '/api/me')).body.currentDay, 3);
   assert.equal((await ana('PUT', '/api/challenge/4', { done: true })).status, 400);
-  // regra: só vale no próprio dia (hoje é o dia 3); dias passados ficam fechados para o aluno
+  // regra: cada dia vale no próprio dia ou no seguinte (hoje é o dia 3): o dia 1 já fechou
   const passado = await ana('PUT', '/api/challenge/1', { done: true });
   assert.equal(passado.status, 400);
   assert.match(passado.body.error, /prazo/);
@@ -174,16 +174,23 @@ test(`fluxo completo do desafio (${backend})`, async (t) => {
   assert.equal((await admin('PUT', `/api/admin/users/${anaId}/challenge/1`, { done: false })).status, 200);
   assert.equal((await ana('GET', '/api/me')).body.score.completed, 1);
 
-  // meia-noite: o dia 3 fecha e o dia 4 abre
+  // meia-noite: o dia 4 abre e o dia 3 ainda pode ser marcado hoje; o dia 2 fecha
   clock = new Date('2026-11-02T03:30:00Z'); // 02/11 00:30 em São Paulo
   assert.equal((await ana('GET', '/api/me')).body.currentDay, 4);
-  assert.equal((await ana('PUT', '/api/challenge/3', { done: false })).status, 400);
+  assert.equal((await ana('PUT', '/api/challenge/2', { done: true })).status, 400);
+  assert.equal((await ana('PUT', '/api/challenge/3', { done: false })).status, 200);
+  assert.equal((await ana('PUT', '/api/challenge/3', { done: true })).status, 200);
+  assert.equal((await ana('PUT', '/api/personal/3', { done: false })).status, 200);
+  assert.equal((await ana('PUT', '/api/personal/2', { done: true })).status, 400);
   assert.equal((await ana('PUT', '/api/challenge/4', { done: true })).status, 200);
 
   // depois do dia 21 nada mais pode ser marcado pelo aluno
   clock = new Date('2026-11-20T15:00:00Z');
   assert.equal((await ana('GET', '/api/me')).body.currentDay, 22);
-  assert.equal((await ana('PUT', '/api/challenge/21', { done: true })).status, 400);
+  assert.equal((await ana('PUT', '/api/challenge/21', { done: true })).status, 200); // dia 21 vale também no dia seguinte
+  assert.equal((await ana('PUT', '/api/challenge/20', { done: true })).status, 400);
+  clock = new Date('2026-11-21T15:00:00Z'); // dia 23: acabou de vez
+  assert.equal((await ana('PUT', '/api/challenge/21', { done: false })).status, 400);
 
   // logout
   await ana('POST', '/api/logout');
@@ -241,4 +248,20 @@ test(`login com Google (${backend})`, async (t) => {
   // token inválido
   assert.equal((await client()('POST', '/api/google', { credential: 'lixo' })).status, 400);
 });
+
+if (databaseUrl) {
+  test(`reconecta quando a conexão com o banco cai (${backend})`, async (t) => {
+    await startApp(t, databaseUrl);
+    const c = client();
+    assert.equal((await c('POST', '/api/register', { name: 'X', email: 'x@x.com', password: '123456', code: 'MOOH21' })).status, 200);
+    // derruba todas as conexões do app com o banco, como acontece quando o Neon dorme
+    const { Client } = require('pg');
+    const killer = new Client({ connectionString: databaseUrl });
+    await killer.connect();
+    await killer.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()');
+    await killer.end();
+    assert.equal((await c('GET', '/api/me')).status, 200);
+    assert.equal((await c('POST', '/api/goals', { text: 'meta depois da queda' })).status, 200);
+  });
+}
 }

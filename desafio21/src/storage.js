@@ -16,6 +16,9 @@ function gcsStorage(bucketName) {
       resumable: false,
       contentType: contentType(name),
       metadata: { cacheControl: CACHE },
+      // "só cria se não existir": torna o envio seguro de repetir, e a biblioteca passa a
+      // tentar de novo sozinha em falhas passageiras de rede.
+      preconditionOpts: { ifGenerationMatch: 0 },
     }),
     remove: (name) => bucket.file(`uploads/${name}`).delete({ ignoreNotFound: true }).catch(() => {}),
     send: (name, res) => {

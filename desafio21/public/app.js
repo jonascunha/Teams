@@ -62,7 +62,7 @@ function formatDate(iso) {
 const ptsLabel = (n) => `${n} ${Math.abs(n) === 1 ? 'ponto' : 'pontos'}`;
 
 // Redimensiona a foto no celular antes do envio (economiza dados e espaço)
-async function resizeImage(file, maxSide = 1440, quality = 0.82) {
+async function resizeImage(file, maxSide = 1280, quality = 0.8) {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((resolve, reject) => {
@@ -84,12 +84,34 @@ async function resizeImage(file, maxSide = 1440, quality = 0.82) {
 
 function pickImage() {
   return new Promise((resolve) => {
+    // O campo precisa estar na página: no iPhone, um campo solto pode ser descartado antes de a
+    // foto ser escolhida, e a escolha "some" (era preciso tentar várias vezes).
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = () => resolve(input.files[0] || null);
+    input.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(input);
+    const finish = (file) => { input.remove(); resolve(file); };
+    input.addEventListener('change', () => finish(input.files[0] || null), { once: true });
+    input.addEventListener('cancel', () => finish(null), { once: true });
     input.click();
   });
+}
+
+// Envio de foto com novas tentativas: rede ruim (academia, 4G) ou o servidor "acordando"
+// não podem fazer a foto se perder. Só repete em falha de conexão ou erro do servidor.
+async function apiWithRetry(method, url, body, onRetry) {
+  const waits = [1500, 3000];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await api(method, url, body);
+    } catch (e) {
+      const retriable = !e.status || e.status >= 500;
+      if (!retriable || attempt >= waits.length) throw e;
+      if (onRetry) onRetry(attempt + 1);
+      await new Promise((r) => setTimeout(r, waits[attempt]));
+    }
+  }
 }
 
 // ---------- modal ----------
@@ -307,6 +329,7 @@ async function viewHome() {
   const { score, meta, currentDay } = me;
   const pct = Math.min(100, Math.round((score.total / meta) * 100));
   const today = currentDay >= 1 && currentDay <= 21 ? ch.days[currentDay - 1] : null;
+  const yesterday = currentDay >= 2 && currentDay <= 22 ? ch.days[currentDay - 2] : null;
   const firstName = me.user.name.split(' ')[0];
 
   let dayBlock;
@@ -358,6 +381,12 @@ async function viewHome() {
 
       <div class="section-title"><h2 class="display">Desafio de hoje</h2></div>
       ${dayBlock}
+      ${yesterday && !yesterday.done ? `
+        <div class="section-title"><h2 class="display">Ainda dá tempo</h2></div>
+        <div class="card row">
+          <div class="grow"><b>Dia ${yesterday.day} · ${esc(yesterday.title)}</b><div class="small muted">O desafio de ontem pode ser marcado até 23h59 de hoje.</div></div>
+          <button class="btn sm" data-day="${yesterday.day}">Marcar</button>
+        </div>` : ''}
 
 
       <div class="section-title"><h2 class="display">Meu desafio individual</h2><a class="small" href="#/perfil">Editar</a></div>
@@ -389,9 +418,9 @@ function personalBlock(me) {
     <div class="row" style="margin-bottom:12px">${icon('target', 22, 'lime')}<b class="grow">${esc(me.user.personal_challenge)}</b><span class="badge dark" id="personal-count">${done.size}/21</span></div>
     <div class="dots">${Array.from({ length: 21 }, (_, i) => {
       const d = i + 1;
-      return `<button class="dot ${done.has(d) ? 'on' : ''} ${d === cur ? 'today' : ''}" data-pday="${d}" ${d !== cur ? 'disabled' : ''} aria-label="Dia ${d}">${d}</button>`;
+      return `<button class="dot ${done.has(d) ? 'on' : ''} ${d === cur ? 'today' : ''}" data-pday="${d}" ${d !== cur && d !== cur - 1 ? 'disabled' : ''} aria-label="Dia ${d}">${d}</button>`;
     }).join('')}</div>
-    <p class="small muted" style="margin-bottom:0">Toque no dia de hoje para marcar que você cumpriu seu desafio individual. Cada dia só vale no próprio dia.</p>
+    <p class="small muted" style="margin-bottom:0">Toque no dia para marcar que você cumpriu seu desafio individual. Dá para marcar no próprio dia ou no dia seguinte.</p>
   </div>`;
 }
 
@@ -425,7 +454,9 @@ function openDay(dayNum, refresh) {
   const ch = state.challenge;
   const d = ch.days.find((x) => x.day === dayNum);
   const locked = ch.currentDay === 0 || d.day > ch.currentDay;
-  const closed = !locked && d.day < ch.currentDay; // regra: cada desafio só vale no próprio dia
+  // regra: cada desafio pode ser marcado no próprio dia ou no dia seguinte
+  const closed = !locked && d.day < ch.currentDay - 1;
+  const lastChance = !locked && d.day === ch.currentDay - 1;
   const reflective = [1, 7, 15, 21].includes(d.day);
   const dateOf = (n) => (ch.startDate ? formatDate(addDays(ch.startDate, n - 1)) : '');
   openModal(`Dia ${d.day}`, `
@@ -435,7 +466,8 @@ function openDay(dayNum, refresh) {
     ${locked ? `<div class="card row">${icon('lock', 20, 'lime')}<span>Este desafio será liberado ${ch.startDate ? 'em ' + esc(dateOf(d.day)) : 'quando o desafio começar'}.</span></div>`
     : closed ? (d.done
       ? `<div class="card row">${icon('check', 20, 'lime')}<span>Você concluiu este desafio. 💪</span></div>${d.note ? `<p class="small muted" style="margin-top:12px;white-space:pre-wrap">${esc(d.note)}</p>` : ''}`
-      : `<div class="card row">${icon('lock', 20, 'lime')}<span>O prazo deste desafio terminou: ele só podia ser marcado em ${esc(dateOf(d.day))}. Foco no desafio de hoje!</span></div>`) : `
+      : `<div class="card row">${icon('lock', 20, 'lime')}<span>O prazo deste desafio terminou: ele podia ser marcado em ${esc(dateOf(d.day))} ou no dia seguinte. Foco no desafio de hoje!</span></div>`) : `
+      ${lastChance && !d.done ? `<div class="card row">${icon('flame', 20, 'lime')}<span>Este é o desafio de ontem. <b>Último dia para marcar: hoje, até 23h59.</b></span></div>` : ''}
       <label class="field" style="margin:14px 0"><span>${reflective ? 'Sua resposta (fica só para você e seus personais)' : 'Anotação (opcional)'}</span>
         <textarea class="input" id="day-note" maxlength="2000" placeholder="${d.day === 1 ? 'Daqui a 21 dias eu quero...' : 'Como foi?'}">${esc(d.note)}</textarea></label>
       <div class="stack">
@@ -489,13 +521,14 @@ async function viewChallenge() {
 
   function dayCard(d) {
     const locked = ch.currentDay === 0 || d.day > ch.currentDay;
-    const missed = !locked && !d.done && d.day < ch.currentDay;
+    const missed = !locked && !d.done && d.day < ch.currentDay - 1;
+    const lastChance = !locked && !d.done && d.day === ch.currentDay - 1;
     const cls = [d.done ? 'done' : '', locked ? 'locked' : '', missed ? 'missed' : '', d.day === ch.currentDay ? 'today' : ''].join(' ');
     return `<button class="day-card ${cls}" data-day="${d.day}">
       <div class="dhead">DIA ${d.day}</div>
       <div class="dic">${icon(locked && !d.done ? 'lock' : d.icon, 34)}</div>
       <div class="dtitle">${esc(d.title)}</div>
-      <div class="dpts"><span class="box">${d.done ? icon('check', 14) : missed ? icon('x', 14) : ''}</span>${missed ? 'NÃO FEITO' : ptsLabel(d.points).toUpperCase()}</div>
+      <div class="dpts"><span class="box">${d.done ? icon('check', 14) : missed ? icon('x', 14) : ''}</span>${missed ? 'NÃO FEITO' : lastChance ? 'ATÉ HOJE' : ptsLabel(d.points).toUpperCase()}</div>
     </button>`;
   }
 }
@@ -682,15 +715,16 @@ async function newPost(after) {
       btn.textContent = 'Enviando...';
       try {
         const hadToday = state.me.postedToday;
-        await api('POST', '/posts', { image: dataUrl, caption: root.querySelector('#caption').value });
+        await apiWithRetry('POST', '/posts', { image: dataUrl, caption: root.querySelector('#caption').value },
+          (n) => { btn.textContent = `Conexão instável, tentando de novo (${n})...`; });
         state.me.postedToday = true;
         closeModal();
         toast(hadToday ? 'Foto publicada!' : 'Foto publicada! +1 ponto de check-in 📸');
         after && after();
       } catch (e) {
-        toast(e.message, true);
+        toast(e.status ? e.message : 'Sem conexão. Verifique a internet e toque em "Tentar de novo".', true);
         btn.disabled = false;
-        btn.textContent = 'Publicar';
+        btn.textContent = 'Tentar de novo';
       }
     });
   });
